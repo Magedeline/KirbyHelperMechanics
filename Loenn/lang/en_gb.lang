@@ -1,0 +1,14 @@
+# K_Player Trigger
+triggers.KirbyHelperMechanics/K_PlayerTrigger.placements.name.k_player_trigger=K_Player Trigger
+triggers.KirbyHelperMechanics/K_PlayerTrigger.attributes.description.spawnKPlayer=Transform the vanilla Player into K_Player on touch, if K_Player isn't already active
+triggers.KirbyHelperMechanics/K_PlayerTrigger.attributes.description.flag=Session flag to set when K_Player enters (leave blank for no flag)
+triggers.KirbyHelperMechanics/K_PlayerTrigger.attributes.description.clearFlagOnLeave=Set the flag back to false when K_Player leaves the trigger area
+triggers.KirbyHelperMechanics/K_PlayerTrigger.attributes.description.onlyOnce=Only fire the enter/leave events and flag once, then stay dormant
+
+# K_Player Refill
+entities.KirbyHelperMechanics/K_PlayerRefill.placements.name.k_player_refill=K_Player Refill
+entities.KirbyHelperMechanics/K_PlayerRefill.attributes.description.oneUse=Disappear permanently after being collected once, instead of respawning
+entities.KirbyHelperMechanics/K_PlayerRefill.attributes.description.refillDash=Refill K_Player's dashes on touch
+entities.KirbyHelperMechanics/K_PlayerRefill.attributes.description.refillStamina=Refill K_Player's climbing stamina on touch
+entities.KirbyHelperMechanics/K_PlayerRefill.attributes.description.refillHealth=Refill K_Player's health on touch
+entities.KirbyHelperMechanics/K_PlayerRefill.attributes.description.respawnTime=Seconds before the refill reappears after being collected (ignored if oneUse is true)

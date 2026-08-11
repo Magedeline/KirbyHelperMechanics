@@ -1,0 +1,377 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+    Graphics/k_sprites.xml is a custom-named sprite bank, loaded explicitly
+    by KirbyHelperMechanicsModule.LoadContent via SpriteBank.LoadSpriteBank;
+    it must NOT be named Graphics/Sprites.xml. DZ's own
+    Mods/DZ/Graphics/Sprites.xml already defines an element also named
+    "kirby_player_ext" (with a different, "kirby_"-prefixed animation
+    scheme: start="kirby_idle", ids like kirby_idle/kirby_walk/kirby_run
+    instead of this mod's vanilla-mirrored idle/walk/runFast). Everest
+    auto-merges every mod's Graphics/Sprites.xml into one shared bank, and
+    DZ's copy gets processed after this mod's, so if this file were also
+    named Sprites.xml, DZ's "kirby_idle"-based kirby_player_ext would
+    silently win and KirbyPlayerController's RenderKirbyOverlay (which
+    calls Sprite.Play with vanilla's own CurrentAnimationID, e.g. "idle")
+    would find no matching animation: the Kirby overlay would render but
+    never animate. Loading this file explicitly from LoadContent (which
+    runs after every mod's Load(), i.e. after Everest's initial auto-merge)
+    guarantees this mod's kirby_player_ext always overwrites whatever DZ's
+    auto-merge left behind, regardless of mod load order.
+
+    The atlas folders below live under characters/KHM/, cutscenes/KHM/, and
+    objects/KHM/, NOT characters/DZ/ etc, for the same reason: DZ ships its
+    own separately-authored Kirby skin at characters/DZ/kirby/ (and
+    characters/DZ/kirby_Playback/, cutscenes/DZ/kirby_payphone/,
+    objects/DZ/kirby/{booster,lookout}/). Everest's asset resolution is
+    per-file, not per-mod-per-folder: with both mods installed, any PNG
+    that exists at the same relative path in both mods' Graphics/Atlases/
+    trees resolves to whichever mod's copy loads last (DZ, in practice),
+    silently discarding this mod's copy for that one frame, while frames
+    this mod has that DZ doesn't (e.g. the extended jumpFast/fall frames,
+    or the extra/levelUp/roll/land additions) are unaffected, since there's
+    nothing to lose to. The net effect used to be individual animations
+    rendering as an inconsistent mix of DZ's art and this mod's art, not
+    just a clean "one mod wins" swap. Using the KHM/ namespace instead of
+    DZ/ makes every one of this mod's asset paths unique, so nothing here
+    can ever collide with DZ's (or any other mod's) content again.
+    Consolidates the Kirby-reskinned atlas folders used by Kirby Helper
+    Mechanics' KirbyPlayerController:
+
+      characters/KHM/kirby            -> kirby_player_ext (read by KirbyPlayerController.Added)
+      characters/KHM/kirby_Playback   -> kirby_playback
+      cutscenes/KHM/kirby_payphone    -> kirby_payphone
+      objects/KHM/kirby/booster       -> kirby_booster / kirby_boosterRed
+      objects/KHM/kirby/lookout       -> kirby_lookout
+
+    kirby_playback/kirby_payphone/kirby_booster/kirby_lookout are staged for
+    future entities (dash-route ghost, cutscene NPC, reskinned booster/lookout)
+    that don't exist in Kirby Helper Mechanics yet; only kirby_player_ext is
+    currently read by code (KirbyPlayerController.Added: GFX.SpriteBank.Create("kirby_player_ext")).
+
+    kirby_player_ext's core movement/state block below is vanilla Celeste's
+    own "player" entry (Content/Graphics/Sprites.xml), copied id-for-id,
+    frame-slice-for-frame-slice, hair-metadata-for-hair-metadata; only the
+    atlas `path` on the root element changed, from characters/player/ to
+    characters/KHM/kirby/, since this atlas's frame folders were built to the
+    same layout (idle/idleA/idleB/idleC, runSlow/runFast/runStumble/runWind,
+    jumpSlow/jumpFast/climb/dreamDash/swim/sleep/wakeUp/etc all match vanilla's
+    own frame counts almost exactly). This mirrors the "component riding the
+    real Player" rewrite (see KirbyPlayerHooks.cs): KirbyPlayerController.
+    RenderKirbyOverlay() copies the REAL vanilla Player.Sprite's
+    CurrentAnimationID onto this bank's Sprite every frame, so whatever
+    vanilla's own UpdateSprite decides (idle/run/climb/dash/duck/...) "just
+    works" as long as the id strings match, exactly the same idea as
+    Picoline's player_atlas.png reskinning vanilla Player without changing
+    vanilla's own animation-selection logic. The hair Metadata block is inert
+    for Kirby (KirbyPlayerController hides the real Player's Hair component
+    entirely) but kept for parity/future use.
+
+    Appended after the vanilla-mirrored block: a small set of Kirby-only
+    ability ids (kirby_inhale_*/kirby_hover/kirby_float/kirby_spit/
+    kirby_damage/kirby_transform_*/kirby_*_death/kirby_angry/kirby_levelUp)
+    that have no vanilla equivalent; KirbyPlayerController's Float/Inhale/
+    StarSpit state callbacks call KirbySprite.Play(...) on those directly,
+    bypassing the per-frame vanilla-id mirroring for the duration of those
+    states.
+
+    kirby_sweat is a separate companion-overlay entry (own root element, not
+    part of kirby_player_ext) for the "sweat/" atlas folder, nervous/danger
+    idle-fidget frames meant to be drawn as a second Sprite layered over
+    kirby_player_ext, the same pattern as a face/eye overlay riding a body
+    sprite. Nothing in Kirby Helper Mechanics reads it yet; staged like
+    kirby_playback/kirby_payphone/kirby_booster/kirby_lookout above.
+
+    Combat animations (extra frames under characters/KHM/kirby/combat/:
+    backflip_/grab_enemy_/groundpound_/punchA_/punchB_/slide_/spin_/
+    super_punch*) are deliberately NOT wired up as ids here; only the
+    death-sequence frames from that same folder are. See the "Combat
+    Animations - Not Added (as requested)" note inline below.
+
+    Dash-count color grading LUTs (not part of the SpriteBank schema below;
+    documented here only because this is the index of Kirby-reskin asset
+    folders): Graphics/ColorGrading/KHM/kirby/{name}.png, one loose top-level
+    PNG per file, not packed into an atlas. This mirrors DZ's own top-level
+    Graphics/ColorGrading/ convention (loaded via Everest.Content.TryGet on
+    "Graphics/ColorGrading/{lutTextureName}", see DZ's
+    Source/Graphics/Effects/ColorGradeEffect.cs) rather than DZ's separate,
+    unrelated per-character-skin convention nested inside the sprite atlas
+    itself (characters/DZ/<skin>/ColorGrading/DashN.png, e.g. Ralsei's).
+
+      Graphics/ColorGrading/KHM/kirby/dash0.png      -> reference key "KHM/kirby/dash0"
+      Graphics/ColorGrading/KHM/kirby/dash0safe.png  -> reference key "KHM/kirby/dash0safe"
+      Graphics/ColorGrading/KHM/kirby/dash2.png      -> reference key "KHM/kirby/dash2"
+      Graphics/ColorGrading/KHM/kirby/dash3.png      -> reference key "KHM/kirby/dash3"
+      Graphics/ColorGrading/KHM/kirby/dash4.png      -> reference key "KHM/kirby/dash4"
+      Graphics/ColorGrading/KHM/kirby/none.png       -> reference key "KHM/kirby/none"
+
+    The reference key is the path under Graphics/ColorGrading/ without the
+    .png extension; whatever eventually applies these (a ColorGradeEffect-
+    style Backdrop, or code reading Player.Dashes directly) would pass that
+    key string, e.g. "KHM/kirby/dash2" for Dashes == 2. Like
+    kirby_playback/kirby_payphone/kirby_booster/kirby_lookout/kirby_sweat
+    above, nothing in Kirby Helper Mechanics reads these yet; KHM has no
+    ColorGradeEffect-equivalent Backdrop ported from DZ, so they're currently
+    orphaned assets.
+-->
+<Sprites>
+
+    <kirby_player_ext path="characters/KHM/kirby/" start="idle">
+      <Origin x="16" y="32" />
+
+      <Loop id="idle_carry" path="idle_carry" delay="0.1" />
+      <Anim id="runSlow_carry" path="run_carry" delay="0.07" />
+      <Loop id="jumpSlow_carry" path="jump_carry" delay="0.1" frames="0,1" />
+      <Anim id="fallSlow_carry" path="jump_carry" delay="0.1" frames="2,3" />
+      <Anim id="pickUp" path="pickup" delay="0.06" />
+      <Anim id="throw" path="throw" delay="0.06" goto="idle" />
+
+      <Anim id="idle" path="idle" delay="0.1" goto="idle" />
+
+      <Anim id="idleA" path="idleA" delay="0.12" goto="idle" />
+      <Anim id="idleB" path="idleB" delay="0.12" goto="idle" />
+      <Anim id="idleC" path="idleC" delay="0.05" goto="idle" />
+
+      <Anim id="lookUp" path="lookUp" delay="0.1" frames="2-7" />
+      <Loop id="walk" path="walk" delay="0.06" />
+      <Loop id="push" path="push" delay="0.1" />
+      <Anim id="runSlow" path="runSlow" delay="0.07" goto="runFast" />
+      <Loop id="runFast" path="runFast" delay="0.05" />
+      <Anim id="runStumble" path="runStumble" delay="0.05" frames="10-11,0-11" goto="runFast" />
+      <Loop id="runWind" path="run_wind" delay="0.095" frames="0-11" />
+      <Loop id="dash" path="dash" delay="0.09" />
+      <Anim id="dreamDashIn" path="dreamDash" frames="0-3" delay="0.04" goto="dreamDashLoop" />
+      <Loop id="dreamDashLoop" path="dreamDash" frames="4-16" delay="0.03" />
+      <Anim id="dreamDashOut" path="dreamDash" frames="17-20" delay="0.04" />
+      <Loop id="slide" path="slide" delay="0.03" />
+      <Loop id="jumpSlow" path="jumpSlow" delay="0.1" frames="0,1" />
+      <Loop id="jumpFast" path="jumpFast" delay="0.1" frames="0,1" />
+      <!-- jumpFast has 15 frames (0-14), not vanilla's 4; frames 2-14 were
+           previously unused. This hangtime sequence (a held near-apex pose,
+           a long hold on the falling pose, then a quick landing flourish)
+           uses the full set for both fallSlow and fallFast. -->
+      <Anim id="fallSlow" path="jumpFast" delay="0.060" frames="2,2,2,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,12,12,13,13,14,14" />
+      <Anim id="fallFast" path="jumpFast" delay="0.060" frames="2,2,2,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,12,12,13,13,14,14" />
+      <Loop id="tired" path="tired" delay="0.18" />
+      <Anim id="tiredStill" path="tired" frames="0" />
+      <Loop id="wallslide" path="climb" frames="0" />
+      <Anim id="climbLookBackStart" path="climb" delay="0.08" frames="6,7,8" goto="climbLookBack" />
+      <Loop id="climbLookBack" path="climb" frames="8" />
+      <Loop id="climbup" path="climb" delay="0.04" frames="0-5" />
+      <Anim id="climbPush" path="climb" delay="0.04" frames="0,9-11" />
+      <Anim id="climbPull" path="climb" delay="0.04" frames="0,12-14" />
+      <Loop id="duck" path="duck" delay="0" frames="0" />
+      <Anim id="fallPose" path="fallPose" delay="0.1" frames="0-10" goto="idle" />
+      <Loop id="edge" path="edge" delay="0.25" frames="0-13" />
+      <Loop id="edgeBack" path="edge_back" delay="0.25" />
+      <Anim id="faint" path="faint" delay="0.1" frames="0-10" goto="fainted" />
+      <Loop id="fainted" path="faint" delay="0.1" frames="10" />
+      <Anim id="flip" path="flip" delay="0.04" frames="0-7" goto="runFast" />
+      <Loop id="skid" path="flip" delay="0.04" frames="8" />
+      <Loop id="dangling" path="dangling" delay="0.11" frames="0-9" />
+      <Anim id="deadside" path="death_h" delay="0.02" frames="0-14" />
+      <Anim id="deadup" path="death_h" delay="0.02" frames="0-14" />
+      <Anim id="deaddown" path="death_h" delay="0.02" frames="0-14" />
+
+      <Loop id="swimIdle" path="swim" frames="0-5" delay="0.08" />
+      <Loop id="swimUp" path="swim" frames="6-11" delay="0.08" />
+      <Loop id="swimDown" path="swim" frames="12-17" delay="0.08" />
+
+      <Anim id="startStarFly" path="startStarFly" delay="0.08" goto="starFly" />
+      <Loop id="starFly" path="starFly" delay="0.08" />
+      <Loop id="bubble" path="bubble" delay="0.08" />
+
+      <Anim id="fall" path="fall" delay="0.06" frames="0-7" />
+      <Loop id="bigFall" path="bigfall" frames="0-4" delay="0.06" />
+      <Anim id="bigFallRecover" path="bigfall" frames="5*5,6*4,7*3,8,8,9,9,10,10,10" delay="0.08" goto="swimIdle" />
+
+      <Anim id="sleep" path="sleep" delay="0.1" frames="0-10,10*5,11-23" />
+      <Anim id="bagdown" path="sleep" delay="0.1" frames="0-10" />
+      <Anim id="asleep" path="wakeUp/" frames="0" />
+      <Anim id="wakeUp" path="wakeUp/" delay=".1" frames="0-4,5*10,6-14" />
+      <Anim id="halfWakeUp" path="halfWakeUp" delay=".1" />
+
+      <Loop id="spin" path="spin" delay="0.1" />
+      <Loop id="shaking" path="shaking" delay="0.1" />
+      <Loop id="hug" path="hug" delay="0.08" />
+
+      <Anim id="starMorph" path="starMorph" delay="0.06" frames="0-16" goto="starMorphIdle" />
+      <Loop id="starMorphIdle" path="starMorph" frames="17" delay="0.06" />
+
+      <Loop id="carryTheoWalk" path="walk_carry_theo" frames="0-11" delay="0.06" />
+      <Anim id="carryTheoCollapse" path="walk_carry_theo" frames="12-18" delay="0.06" />
+
+      <Anim id="tentacle_grab" path="tentacle/grab" delay="0.06" frames="0-14" goto="tentacle_grabbed" />
+      <Loop id="tentacle_grabbed" path="tentacle/grab" delay="0.1" frames="15-23" />
+      <Loop id="tentacle_pull" path="tentacle/grab" frames="24" delay="0.1" />
+      <Loop id="tentacle_dangling" path="tentacle/grab" frames="25" delay="0.1" />
+
+      <Anim id="sitDown" path="sitDown" delay="0.1" />
+
+      <Loop id="launch" path="launch" delay="0.06" frames="0-7" />
+      <Anim id="launchRecover" path="launchRecover" delay="0.06" />
+
+      <!-- Trimmed to just the "carry" entries: those directly affect where a
+           carried object (e.g. Theo) is drawn relative to Kirby and are
+           functionally live. The rest of vanilla's hair-position Frames data
+           is dropped rather than kept-but-stale, since it's fully inert for
+           Kirby: KirbyPlayerController hides the real Player's Hair
+           component entirely (see the file header comment). -->
+      <Metadata>
+        <Frames path="idle_carry" hair="x" carry="-1,-1,-1,0,0,0,0,0,-1" />
+        <Frames path="jump_carry" hair="x" carry="-3,-3,-1,-1" />
+        <Frames path="run_carry" hair="x" carry="-1,0,0,0,-3,-2,-1,0,0,0,-3,-1" />
+      </Metadata>
+
+      <!-- Kirby-only abilities (no vanilla equivalent); KirbyPlayerController
+           plays these directly during StKirbyFloat/StKirbyInhale/StKirbyStarSpit,
+           bypassing the per-frame vanilla-id mirroring for those states. -->
+      <Anim id="kirby_inhale_start" path="inhalebegin" delay="0.06" goto="kirby_inhale_loop" />
+      <Loop id="kirby_inhale_loop" path="inhaleloop" delay="0.08" />
+      <Anim id="kirby_inhale_end" path="inhaleend" delay="0.06" goto="idle" />
+      <Loop id="kirby_hover" path="hover" delay="0.12" frames="0-1" />
+      <Loop id="kirby_float" path="float" delay="0.12" frames="0-1" />
+      <Anim id="kirby_spit" path="spit" delay="0.05" />
+      <Anim id="kirby_damage" path="hurt" delay="0.08" goto="idle" />
+
+      <!-- Transformation Animations. NOTE: path is "kirby_transform_in"/
+           "kirby_transform_out", NOT the bare "transform_in"/"transform_out"
+           folders: the bare "transform_in" set is missing its first two
+           frames (starts at transform_in02.png), an incomplete leftover
+           export; "kirby_transform_in00-19.png" is the complete 20-frame
+           sequence. "kirby_transform_out" and bare "transform_out" are both
+           complete/identical, but kept the "kirby_"-prefixed one for
+           consistency with transform_in. -->
+      <Anim id="kirby_transform_in" path="kirby_transform_in" delay="0.06" goto="idle" />
+      <Anim id="kirby_transform_out" path="kirby_transform_out" delay="0.06" />
+
+      <!-- Reactions: "extra/" and "levelUp/" atlas folders, previously unreferenced -->
+      <Anim id="kirby_angry" path="extra/angry" delay="0.08" frames="0-5" goto="idle" />
+      <Anim id="kirby_levelUp" path="levelUp/levelUp" delay="0.05" frames="0-26" goto="idle" />
+
+      <!-- Combat Animations - Not Added (as requested); Mouthful/Swallow below
+           use real dedicated art (idlemouthful/, walkmouthful/, exhale/), not
+           placeholders; only Range and Copy still borrow another id's frames
+           since no dedicated "range"/"copy" art exists yet. -->
+      <Anim id="kirby_range" path="spit" delay="0.05" goto="idle" />
+      <Loop id="kirby_mouthful" path="idlemouthful" delay="0.08" />
+      <Loop id="kirby_walkmouthful" path="walkmouthful" delay="0.06" />
+      <Anim id="kirby_swallow" path="exhale" delay="0.08" goto="idle" />
+      <Anim id="kirby_copy" path="kirby_transform_in" delay="0.06" goto="idle" />
+
+      <!-- Staged for a future roll-attack/landing-impact ability; no
+           KirbyPlayerController state calls these yet (same "staged" pattern
+           as kirby_booster/kirby_lookout below), but the atlas has dedicated
+           roll/, rollGetup/, rollSit.png, and land/ art already. Roll chains
+           into a getup recovery that settles into a held "downed"/resting
+           pose (rollSit) rather than snapping straight back to idle; a future
+           controller integration decides how/when that resolves back to
+           idle (timer vs. input). -->
+      <Anim id="kirby_roll" path="roll" delay="0.05" />
+      <Anim id="kirby_rollGetup" path="rollGetup" delay="0.1" goto="kirby_rollSit" />
+      <Loop id="kirby_rollSit" path="rollSit" delay="0.8" />
+      <Anim id="kirby_land" path="land" delay="0.05" goto="idle" />
+
+      <!-- Death Animations -->
+      <Anim id="kirby_pre_death" path="combat/pre_death_" delay="0.08" goto="kirby_mid_death" />
+      <Anim id="kirby_mid_death" path="combat/mid_death_" delay="0.08" goto="kirby_post_death" />
+      <Anim id="kirby_post_death" path="combat/post_death_" delay="0.08" />
+      <Anim id="kirby_death" path="combat/death_" delay="0.08" />
+    </kirby_player_ext>
+
+    <kirby_playback copy="player" path="characters/KHM/kirby_Playback/" />
+
+    <kirby_payphone path="cutscenes/KHM/kirby_payphone/" start="idle">
+      <Justify x="0.5" y="1" />
+
+      <Loop id="idle" path="phone" delay="0.1" frames="0" />
+      <Anim id="pickUp" path="phone" delay="0.08" frames="1-11" />
+      <Loop id="talkPhone" path="phone" delay="0.08" frames="11" />
+      <Anim id="jumpBack" path="phone" delay="0.08" frames="12-17" />
+      <Anim id="scare" path="phone" delay="0.08" frames="18-21" />
+      <Anim id="transform" path="phone" delay="0.08" frames="22-45" />
+      <Anim id="eat" path="phone" delay="0.08" frames="46-73,83*2,84*2,85*2,86*2,87*2,74-82" />
+      <Loop id="monsterIdle" path="phone" delay="0.2" frames="83-87" />
+    </kirby_payphone>
+
+    <kirby_booster path="objects/KHM/kirby/booster/" start="loop">
+      <Justify x="0.5" y="0.5" />
+      <Loop id="loop" path="booster" delay="0.1" frames="0-4" />
+      <Loop id="inside" path="booster" delay="0.1" frames="5-8" />
+      <Loop id="spin" path="booster" delay="0.06" frames="18-25" />
+      <Anim id="pop" path="booster" delay="0.08" frames="9-17" />
+    </kirby_booster>
+
+    <kirby_boosterRed path="objects/KHM/kirby/booster/" start="loop">
+      <Justify x="0.5" y="0.5" />
+      <Anim id="appear" path="boosterRed" delay="0.08" frames="26-34" goto="loop" />
+      <Loop id="loop" path="boosterRed" delay="0.1" frames="0-4" />
+      <Loop id="inside" path="boosterRed" delay="0.1" frames="5-8" />
+      <Loop id="spin" path="boosterRed" delay="0.06" frames="18-25" />
+      <Anim id="pop" path="boosterRed" delay="0.08" frames="9-17" />
+    </kirby_boosterRed>
+
+    <kirby_lookout path="objects/KHM/kirby/lookout/" start="idle">
+      <Justify x="0.5" y="1" />
+
+      <Loop id="idle" path="lookout" delay="0.1" frames="5*9,6" />
+      <Anim id="lookRight" path="lookout" delay="0.08" frames="0-4" goto="looking" />
+      <Anim id="lookLeft" path="lookout" delay="0.08" frames="15-17,3,4" goto="looking" />
+      <Loop id="looking" path="lookout" delay="0.08" frames="4" />
+      <Loop id="lookingUp" path="lookout" frames="7" />
+      <Loop id="lookingUpRight" path="lookout" frames="8" />
+      <Loop id="lookingRight" path="lookout" frames="9" />
+      <Loop id="lookingDownRight" path="lookout" frames="10" />
+      <Loop id="lookingDown" path="lookout" frames="11" />
+      <Loop id="lookingDownLeft" path="lookout" frames="12" />
+      <Loop id="lookingLeft" path="lookout" frames="13" />
+      <Loop id="lookingUpLeft" path="lookout" frames="14" />
+
+      <Loop id="badeline_idle" path="badeline" delay="0.1" frames="5*9,6" />
+      <Anim id="badeline_lookRight" path="badeline" delay="0.08" frames="0-4" goto="badeline_looking" />
+      <Anim id="badeline_lookLeft" path="badeline" delay="0.08" frames="15-17,3,4" goto="badeline_looking" />
+      <Loop id="badeline_looking" path="badeline" delay="0.08" frames="4" />
+      <Loop id="badeline_lookingUp" path="badeline" frames="7" />
+      <Loop id="badeline_lookingUpRight" path="badeline" frames="8" />
+      <Loop id="badeline_lookingRight" path="badeline" frames="9" />
+      <Loop id="badeline_lookingDownRight" path="badeline" frames="10" />
+      <Loop id="badeline_lookingDown" path="badeline" frames="11" />
+      <Loop id="badeline_lookingDownLeft" path="badeline" frames="12" />
+      <Loop id="badeline_lookingLeft" path="badeline" frames="13" />
+      <Loop id="badeline_lookingUpLeft" path="badeline" frames="14" />
+
+      <Loop id="nobackpack_idle" path="nobackpack" delay="0.1" frames="5*9,6" />
+      <Anim id="nobackpack_lookRight" path="nobackpack" delay="0.08" frames="0-4" goto="nobackpack_looking" />
+      <Anim id="nobackpack_lookLeft" path="nobackpack" delay="0.08" frames="15-17,3,4" goto="nobackpack_looking" />
+      <Loop id="nobackpack_looking" path="nobackpack" delay="0.08" frames="4" />
+      <Loop id="nobackpack_lookingUp" path="nobackpack" frames="7" />
+      <Loop id="nobackpack_lookingUpRight" path="nobackpack" frames="8" />
+      <Loop id="nobackpack_lookingRight" path="nobackpack" frames="9" />
+      <Loop id="nobackpack_lookingDownRight" path="nobackpack" frames="10" />
+      <Loop id="nobackpack_lookingDown" path="nobackpack" frames="11" />
+      <Loop id="nobackpack_lookingDownLeft" path="nobackpack" frames="12" />
+      <Loop id="nobackpack_lookingLeft" path="nobackpack" frames="13" />
+      <Loop id="nobackpack_lookingUpLeft" path="nobackpack" frames="14" />
+    </kirby_lookout>
+
+    <kirby_sweat path="characters/KHM/kirby/sweat/" start="idle">
+      <Justify x="0.5" y="0.5" />
+      <Loop id="idle" path="idle" delay="0.1" frames="0" />
+      <Loop id="still" path="still" delay="0.12" frames="0-5" />
+      <Loop id="climb" path="climb" delay="0.06" frames="0-7" />
+      <Loop id="jump" path="jump" delay="0.08" frames="0-3" />
+      <Loop id="danger" path="danger" delay="0.06" frames="0-5" />
+    </kirby_sweat>
+
+    <!-- Read by KirbyShoes.cs (GFX.SpriteBank.Create("kirby_shoes")). Single
+         10x10 frame (shoes00.png) directly under characters/KHM/kirby/, not
+         a subfolder. Origin is absolute pixels (bottom-center of the 10x10
+         canvas, one row up from the very bottom edge) so it lines up with
+         player.Sprite.RenderPosition, the same feet-anchor convention
+         kirby_player_ext uses, and mirrors correctly via Sprite.FlipX
+         without any manual per-facing position math. -->
+    <kirby_shoes path="characters/KHM/kirby/" start="idle">
+      <Origin x="5" y="9" />
+      <Loop id="idle" path="shoes" delay="0.1" frames="0" />
+    </kirby_shoes>
+
+</Sprites>
