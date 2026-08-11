@@ -116,7 +116,7 @@ namespace Celeste.Entities
             player.Hair.Visible = false;
             player.Hair.SimulateMotion = false;
 
-            KirbySprite = GFX.SpriteBank.Create(K_PlayerSprites.SpriteBankId);
+            KirbySprite = GFX.SpriteBank.Create(K_PlayerAnimIds.SpriteBankId);
             KirbySprite.Visible = false; // drawn manually by KirbyPlayerHooks' Render hook, not auto-rendered
             Shoes = new KirbyShoes(player);
 
@@ -215,7 +215,7 @@ namespace Celeste.Entities
 
             // Puffed-up squash on entry.
             player.Sprite.Scale = new Vector2(1.3f, 0.75f);
-            KirbySprite?.Play(K_PlayerSprites.Float);
+            KirbySprite?.Play(K_PlayerAnimIds.Float);
 
             // Reuses vanilla's own jump sound as the "puff" cue -- the legacy
             // K_Player played a DZ-only "event:/DZ/char/kirby/jump" FMOD event that
@@ -348,7 +348,7 @@ namespace Celeste.Entities
             player.Speed = Vector2.Zero;
 
             player.Sprite.Play("idle");
-            KirbySprite?.Play(K_PlayerSprites.InhaleStart); // chains to InhaleLoop via its own goto
+            KirbySprite?.Play(K_PlayerAnimIds.InhaleStart); // chains to InhaleLoop via its own goto
             Input.Rumble(RumbleStrength.Light, RumbleLength.Short);
 
             CreateKirbyInhaleTendrils();
@@ -363,7 +363,7 @@ namespace Celeste.Entities
             kirbyInhaleTendrils = null;
             // Harmless even when chaining straight into StKirbyStarSpit -- that
             // state's own Begin() plays over this in the same StateMachine.Update().
-            KirbySprite?.Play(K_PlayerSprites.InhaleEnd);
+            KirbySprite?.Play(K_PlayerAnimIds.InhaleEnd);
         }
 
         private int KirbyInhaleUpdate()
@@ -571,7 +571,7 @@ namespace Celeste.Entities
             player.Speed = Vector2.Zero;
             player.Sprite.Play(PlayerSprite.Dash);
             player.Sprite.Scale = new Vector2(1.4f, .6f);
-            KirbySprite?.Play(K_PlayerSprites.Spit);
+            KirbySprite?.Play(K_PlayerAnimIds.Spit);
 
             Input.Rumble(RumbleStrength.Medium, RumbleLength.Short);
         }

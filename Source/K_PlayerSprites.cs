@@ -1,104 +1,205 @@
+using Microsoft.Xna.Framework;
+using Monocle;
+using System;
+using System.Collections.Generic;
+using System.Xml;
+
 namespace Celeste.Mod.KirbyHelperMechanics
 {
     /// <summary>
-    /// Animation id constants for the "kirby_player_ext" sprite bank entry
-    /// (Graphics/k_sprites.xml), mirroring vanilla Celeste's PlayerSprite
-    /// pattern of exposing animation ids as fields instead of magic strings.
-    /// Keep in sync with Graphics/k_sprites.xml -- every id here must exist
-    /// as an Anim/Loop id under kirby_player_ext, and vice versa.
+    /// Kirby-side port of vanilla's Celeste.PlayerSprite -- a Sprite subclass
+    /// that resolves which sprite bank to build from based on
+    /// <see cref="K_PlayerSpriteMode"/>, plus the same hair/carry frame
+    /// metadata plumbing vanilla's PlayerSprite exposes via its Metadata/Frames
+    /// XML. Declared in Celeste.Mod.KirbyHelperMechanics (not Celeste) and named
+    /// with a K_ prefix so it never collides with the vanilla Celeste.PlayerSprite
+    /// type shipped in Celeste.dll. Animation id constants for the actual
+    /// kirby_player_ext bank live in <see cref="K_PlayerAnimIds"/>, not here --
+    /// the fields below mirror vanilla's own bare ids (idle/walk/runFast/etc.)
+    /// since kirby_player_ext's ids deliberately match vanilla's "player" entry
+    /// (see KirbyPlayerController.RenderKirbyOverlay).
     /// </summary>
-    public static class K_PlayerSprites
+    public class K_PlayerSprite : Sprite
     {
-        public const string SpriteBankId = "kirby_player_ext";
+        public const string Idle = "idle";
+        public const string Shaking = "shaking";
+        public const string FrontEdge = "edge";
+        public const string LookUp = "lookUp";
+        public const string Walk = "walk";
+        public const string RunSlow = "runSlow";
+        public const string RunFast = "runFast";
+        public const string RunWind = "runWind";
+        public const string RunStumble = "runStumble";
+        public const string JumpSlow = "jumpSlow";
+        public const string FallSlow = "fallSlow";
+        public const string Fall = "fall";
+        public const string JumpFast = "jumpFast";
+        public const string FallFast = "fallFast";
+        public const string FallBig = "bigFall";
+        public const string LandInPose = "fallPose";
+        public const string Tired = "tired";
+        public const string TiredStill = "tiredStill";
+        public const string WallSlide = "wallslide";
+        public const string ClimbUp = "climbUp";
+        public const string ClimbDown = "climbDown";
+        public const string ClimbLookBackStart = "climbLookBackStart";
+        public const string ClimbLookBack = "climbLookBack";
+        public const string Dangling = "dangling";
+        public const string Duck = "duck";
+        public const string Dash = "dash";
+        public const string Sleep = "sleep";
+        public const string Sleeping = "asleep";
+        public const string Flip = "flip";
+        public const string Skid = "skid";
+        public const string DreamDashIn = "dreamDashIn";
+        public const string DreamDashLoop = "dreamDashLoop";
+        public const string DreamDashOut = "dreamDashOut";
+        public const string SwimIdle = "swimIdle";
+        public const string SwimUp = "swimUp";
+        public const string SwimDown = "swimDown";
+        public const string StartStarFly = "startStarFly";
+        public const string StarFly = "starFly";
+        public const string StarMorph = "starMorph";
+        public const string IdleCarry = "idle_carry";
+        public const string RunCarry = "runSlow_carry";
+        public const string JumpCarry = "jumpSlow_carry";
+        public const string FallCarry = "fallSlow_carry";
+        public const string PickUp = "pickup";
+        public const string Throw = "throw";
+        public const string Launch = "launch";
+        public const string TentacleGrab = "tentacle_grab";
+        public const string TentacleGrabbed = "tentacle_grabbed";
+        public const string TentaclePull = "tentacle_pull";
+        public const string TentacleDangling = "tentacle_dangling";
+        public const string SitDown = "sitDown";
 
-        // Basic Animations
-        public const string Idle = "kirby_idle";
-        public const string Walk = "kirby_walk";
-        public const string Run = "kirby_run";
-        public const string Jump = "kirby_jump";
-        public const string Fall = "kirby_fall";
+        private readonly string spriteName;
+        public int HairCount = 4;
+        private static readonly Dictionary<string, PlayerAnimMetadata> FrameMetadata = new(StringComparer.OrdinalIgnoreCase);
 
-        // Kirby Abilities
-        public const string InhaleStart = "kirby_inhale_start";
-        public const string InhaleLoop = "kirby_inhale_loop";
-        public const string InhaleEnd = "kirby_inhale_end";
-        public const string Hover = "kirby_hover";
-        public const string Float = "kirby_float";
-        public const string Spit = "kirby_spit";
-        public const string Damage = "kirby_damage";
+        public K_PlayerSpriteMode Mode { get; private set; }
 
-        // Transformation Animations
-        public const string TransformIn = "kirby_transform_in";
-        public const string TransformOut = "kirby_transform_out";
+        public K_PlayerSprite(K_PlayerSpriteMode mode)
+            : base(null, null)
+        {
+            Mode = mode;
+            string id = "";
+            switch (mode)
+            {
+                case K_PlayerSpriteMode.Kirby:
+                    id = "kirby_player_ext";
+                    break;
+                case K_PlayerSpriteMode.KirbyNoBackpack:
+                    id = "kirby_player_ext_no_backpack";
+                    break;
+                case K_PlayerSpriteMode.KirbyKnght:
+                    id = "kirby_knight_ext";
+                    break;
+                case K_PlayerSpriteMode.Playback:
+                    id = "kirby_player_ext_playback";
+                    break;
+            }
+            spriteName = id;
+            GFX.SpriteBank.CreateOn(this, id);
+        }
 
-        // Reactions
-        public const string Angry = "kirby_angry";
-        public const string LevelUp = "kirby_levelUp";
+        public Vector2 HairOffset
+        {
+            get
+            {
+                return Texture != null && FrameMetadata.TryGetValue(Texture.AtlasPath, out PlayerAnimMetadata playerAnimMetadata) ? playerAnimMetadata.HairOffset : Vector2.Zero;
+            }
+        }
 
-        // Power States - Fire
-        public const string FireIdle = "kirby_fire_idle";
-        public const string FireWalk = "kirby_fire_walk";
-        public const string FireAttack = "kirby_fire_attack";
-        public const string FireBreath = "kirby_fire_breath";
-        public const string FireDashball = "kirby_fire_dashball";
+        public float CarryYOffset
+        {
+            get
+            {
+                return Texture != null && FrameMetadata.TryGetValue(Texture.AtlasPath, out PlayerAnimMetadata playerAnimMetadata) ? playerAnimMetadata.CarryYOffset * Scale.Y : 0.0f;
+            }
+        }
 
-        // Power States - Ice
-        public const string IceIdle = "kirby_ice_idle";
-        public const string IceWalk = "kirby_ice_walk";
-        public const string IceAttack = "kirby_ice_attack";
-        public const string IceShard = "kirby_ice_shard";
-        public const string IceSlide = "kirby_ice_slide";
-        public const string IceBreath = "kirby_ice_breath";
+        public int HairFrame
+        {
+            get
+            {
+                return Texture != null && FrameMetadata.TryGetValue(Texture.AtlasPath, out PlayerAnimMetadata playerAnimMetadata) ? playerAnimMetadata.Frame : 0;
+            }
+        }
 
-        // Power States - Spark
-        public const string SparkIdle = "kirby_spark_idle";
-        public const string SparkWalk = "kirby_spark_walk";
-        public const string SparkAttack = "kirby_spark_attack";
-        public const string SparkShield = "kirby_spark_shield";
-        public const string SparkCharge = "kirby_sparkDZ_CHarge";
-        public const string SparkRelease = "kirby_spark_release";
+        public bool HasHair
+        {
+            get
+            {
+                return Texture != null && FrameMetadata.TryGetValue(Texture.AtlasPath, out PlayerAnimMetadata playerAnimMetadata) && playerAnimMetadata.HasHair;
+            }
+        }
 
-        // Power States - Stone
-        public const string StoneIdle = "kirby_stone_idle";
-        public const string StoneWalk = "kirby_stone_walk";
-        public const string StoneTransform = "kirby_stone_transform";
-        public const string StoneForm = "kirby_stone_form";
-        public const string StoneShatter = "kirby_stone_shatter";
-        public const string StonePrebigform = "kirby_stone_prebigform";
-        public const string StoneBigformgroundpound = "kirby_stone_bigformgroundpound";
-        public const string BigformShatter = "kirby_bigform_shatter";
+        public bool Running
+        {
+            get
+            {
+                if (LastAnimationID == null)
+                    return false;
+                return LastAnimationID == "flip" || LastAnimationID.StartsWith("run");
+            }
+        }
 
-        // Power States - Sword
-        public const string SwordIdle = "kirby_sword_idle";
-        public const string SwordWalk = "kirby_sword_walk";
-        public const string SwordAttack1 = "kirby_sword_attack1";
-        public const string SwordAttack2 = "kirby_sword_attack2";
-        public const string SwordSpin = "kirby_sword_spin";
-        public const string SwordDash = "kirby_sword_dash";
-        public const string SwordParry = "kirby_sword_parry";
-        public const string SwordSliceup = "kirby_sword_sliceup";
-        public const string SwordFinalslice = "kirby_sword_finalslice";
+        public bool DreamDashing => LastAnimationID != null && LastAnimationID.StartsWith("dreamDash");
 
-        // Combat Animations - Range and Copy are still placeholders (no
-        // dedicated art); Mouthful/Swallow use real dedicated art.
-        public const string Range = "kirby_range";
-        public const string Mouthful = "kirby_mouthful";
-        public const string WalkMouthful = "kirby_walkmouthful";
-        public const string Swallow = "kirby_swallow";
-        public const string Copy = "kirby_copy";
+        public override void Render()
+        {
+            Vector2 renderPosition = RenderPosition;
+            RenderPosition = RenderPosition.Floor();
+            base.Render();
+            RenderPosition = renderPosition;
+        }
 
-        // Staged for a future roll-attack/landing-impact ability -- ids exist
-        // in Graphics/k_sprites.xml but no KirbyPlayerController state calls
-        // them yet.
-        public const string Roll = "kirby_roll";
-        public const string RollGetup = "kirby_rollGetup";
-        public const string RollSit = "kirby_rollSit";
-        public const string Land = "kirby_land";
+        public static void CreateFramesMetadata(string sprite)
+        {
+            foreach (SpriteDataSource source in GFX.SpriteBank.SpriteData[sprite].Sources)
+            {
+                XmlElement xmlElement = source.XML["Metadata"];
+                string str1 = source.Path;
+                if (xmlElement != null)
+                {
+                    if (!string.IsNullOrEmpty(source.OverridePath))
+                        str1 = source.OverridePath;
+                    foreach (XmlElement xml in xmlElement.GetElementsByTagName("Frames"))
+                    {
+                        string str2 = str1 + xml.Attr("path", "");
+                        string[] strArray1 = xml.Attr("hair").Split('|');
+                        string[] strArray2 = xml.Attr("carry", "").Split(',');
+                        for (int index = 0; index < Math.Max(strArray1.Length, strArray2.Length); ++index)
+                        {
+                            PlayerAnimMetadata playerAnimMetadata = new();
+                            string str3 = str2 + (index < 10 ? "0" : (object)"") + index;
+                            if (index == 0 && !GFX.Game.Has(str3))
+                                str3 = str2;
+                            FrameMetadata[str3] = playerAnimMetadata;
+                            if (index < strArray1.Length)
+                            {
+                                if (strArray1[index].Equals("x", StringComparison.OrdinalIgnoreCase) || strArray1[index].Length <= 0)
+                                {
+                                    playerAnimMetadata.HasHair = false;
+                                }
+                                else
+                                {
+                                    string[] strArray3 = strArray1[index].Split(':');
+                                    string[] strArray4 = strArray3[0].Split(',');
+                                    playerAnimMetadata.HasHair = true;
+                                    playerAnimMetadata.HairOffset = new Vector2(Convert.ToInt32(strArray4[0]), Convert.ToInt32(strArray4[1]));
+                                    playerAnimMetadata.Frame = strArray3.Length >= 2 ? Convert.ToInt32(strArray3[1]) : 0;
+                                }
+                            }
+                            if (index < strArray2.Length && strArray2[index].Length > 0)
+                                playerAnimMetadata.CarryYOffset = int.Parse(strArray2[index]);
+                        }
+                    }
+                }
+            }
+        }
 
-        // Death Animations
-        public const string PreDeath = "kirby_pre_death";
-        public const string MidDeath = "kirby_mid_death";
-        public const string PostDeath = "kirby_post_death";
-        public const string Death = "kirby_death";
+        public static void ClearFramesMetadata() => FrameMetadata.Clear();
     }
 }
