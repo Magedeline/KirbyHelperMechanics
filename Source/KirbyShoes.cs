@@ -14,8 +14,12 @@ namespace Celeste.Entities
         /// <summary>Current shoe tint. Set each frame from UpdateHair.</summary>
         public Color Color
         {
-            get => sprite.Color;
-            set => sprite.Color = value;
+            get => sprite?.Color ?? Color.White;
+            set
+            {
+                if (sprite != null)
+                    sprite.Color = value;
+            }
         }
 
         private readonly global::Celeste.Player player;
@@ -24,12 +28,23 @@ namespace Celeste.Entities
         public KirbyShoes(global::Celeste.Player player) : base(active: true, visible: false)
         {
             this.player = player;
-            sprite = GFX.SpriteBank.Create("kirby_shoes");
-            sprite.Color = Calc.HexToColor("ff99cc");
+            // "kirby_shoes" lives only in Graphics/k_sprites.xml (no vanilla-Sprites.xml
+            // fallback like kirby_player_ext has), so if this component gets built before
+            // KirbyHelperMechanicsModule.LoadContent has merged that bank in, GFX.SpriteBank
+            // won't have the id yet. Guard instead of crashing the whole room load; the
+            // shoes just don't render for that instance (same pattern as BossActor.cs).
+            if (GFX.SpriteBank != null && GFX.SpriteBank.Has("kirby_shoes"))
+            {
+                sprite = GFX.SpriteBank.Create("kirby_shoes");
+                sprite.Color = Calc.HexToColor("ff99cc");
+            }
         }
 
         public override void Render()
         {
+            if (sprite == null)
+                return;
+
             sprite.RenderPosition = player.Sprite.RenderPosition;
             sprite.FlipX = player.Facing == Facings.Left;
             sprite.Render();
