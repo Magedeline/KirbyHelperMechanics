@@ -72,7 +72,25 @@ namespace Celeste.Mod.KirbyHelperMechanics
         public override void LoadContent(bool firstLoad)
         {
             base.LoadContent(firstLoad);
-            Monocle.SpriteBank.LoadSpriteBank("Graphics/k_sprites.xml");
+
+            // Monocle.SpriteBank.LoadSpriteBank(path) (the static helper) only
+            // merges multiple mods' overrides of the SAME vanilla content path --
+            // for a mod-only path like "Graphics/k_sprites.xml" (never a vanilla
+            // file) it just parses and returns an XmlDocument with no side
+            // effects. Discarding that return value, as this used to do, never
+            // registered kirby_player_ext/kirby_shoes/etc into GFX.SpriteBank at
+            // all; on any setup where DZ (which defines its own colliding
+            // kirby_player_ext) isn't installed, GFX.SpriteBank.Create throws
+            // "Missing animation name in SpriteData" the first time Kirby is
+            // selected. Building our own SpriteBank from the file and merging its
+            // entries into the real GFX.SpriteBank is what actually registers
+            // them -- and per the file's own header comment, doing this in
+            // LoadContent (after every mod's Load(), i.e. after Everest's own
+            // Graphics/Sprites.xml auto-merge pass) makes this mod's entries win
+            // over DZ's regardless of mod load order.
+            var kirbySpriteBank = new Monocle.SpriteBank(GFX.Game, "Graphics/k_sprites.xml");
+            foreach (var entry in kirbySpriteBank.SpriteData)
+                GFX.SpriteBank.SpriteData[entry.Key] = entry.Value;
             // KirbyPlayerController rides the real vanilla Player, so it reads
             // global::Celeste.Player's own P_DashA/P_DashB/etc particle-type
             // statics directly -- no separate copy step needed here anymore.

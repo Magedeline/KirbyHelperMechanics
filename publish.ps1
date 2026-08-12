@@ -48,6 +48,32 @@ foreach ($item in $includePaths) {
 }
 
 Write-Host "Zipping to $zipPath..."
-Compress-Archive -Path (Join-Path $stageDir "*") -DestinationPath $zipPath -Force
+if (Test-Path $zipPath) {
+    Remove-Item $zipPath -Force
+}
+# Both Compress-Archive AND [System.IO.Compression.ZipFile]::CreateFromDirectory
+# write zip entries using the OS path separator -- on Windows that means every
+# entry ends up as "bin\KirbyHelperMechanics.dll" instead of
+# "bin/KirbyHelperMechanics.dll" (verified directly; CreateFromDirectory does
+# NOT normalize this the way its docs might imply). The ZIP spec requires
+# forward slashes, and Everest's mod loader (which has to work identically on
+# Windows/Linux/Mac) reads entries expecting "/" -- with backslash entries it
+# can read everest.yaml (a lone root file) but can't resolve "DLL: bin/..."
+# to anything inside the archive, so the mod shows up but its assembly "fails
+# to load". Build the archive entry-by-entry instead, explicitly forcing "/"
+# in every entry name ourselves.
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+Add-Type -AssemblyName System.IO.Compression
+$zip = [System.IO.Compression.ZipFile]::Open($zipPath, [System.IO.Compression.ZipArchiveMode]::Create)
+try {
+    Get-ChildItem -Path $stageDir -Recurse -File | ForEach-Object {
+        $relativePath = $_.FullName.Substring($stageDir.Length + 1) -replace '\\', '/'
+        [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+            $zip, $_.FullName, $relativePath, [System.IO.Compression.CompressionLevel]::Optimal
+        ) | Out-Null
+    }
+} finally {
+    $zip.Dispose()
+}
 
 Write-Host "Done: $zipPath"
