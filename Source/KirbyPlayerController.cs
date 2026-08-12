@@ -731,12 +731,12 @@ namespace Celeste.Entities
             KirbySprite.RenderPosition = player.Sprite.RenderPosition;
             KirbySprite.Scale = player.Sprite.Scale;
             KirbySprite.Rotation = player.Sprite.Rotation;
-            // player.Sprite.Color is White except during a flash effect (hurt,
-            // bounce, etc) -- same convention vanilla's own PlayerHair uses to
-            // decide when to show its dash-tier color vs. the flash color.
-            KirbySprite.Color = player.Sprite.Color == Color.White
-                ? KirbyDashColors.GetColor(player.Dashes, level?.TimeActive ?? 0f)
-                : player.Sprite.Color;
+            // idle00.png etc are fully painted art (pink body, red cheeks/feet,
+            // black eyes), not a white silhouette like vanilla hair or the shoes
+            // sprite -- multiplying the whole body by a flat dash-tier color turns
+            // it into a solid-color blob. Only mirror vanilla's own flash-effect
+            // tinting (hurt/bounce/etc), never apply KirbyDashColors here.
+            KirbySprite.Color = player.Sprite.Color;
             KirbySprite.Render();
         }
     }
