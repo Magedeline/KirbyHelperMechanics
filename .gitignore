@@ -3,4 +3,5 @@ Source/.vs/
 Source/bin/
 Source/obj/
 bin/
+dist/
 *.user

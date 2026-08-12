@@ -143,8 +143,15 @@ namespace Celeste.Entities
         private const float KirbyFlapScaleTime = 0.12f;
         private const float KirbyAirPuffSpeed = 120f;
 
+        // Total hold-time cap for a single float session, independent of flap
+        // charges -- without this a player can glide almost indefinitely at
+        // KirbyFloatFallSpeed once flaps run out, since that terminal speed is so
+        // low. Resets to full every time float is (re-)entered from grounded.
+        private const float KirbyFloatMaxDuration = 2.5f;
+
         private int kirbyFlapCount;
         private float kirbyFlapScaleTimer;
+        private float kirbyFloatDurationTimer;
 
         // Rising-edge jump detection: Kirby's air abilities must only trigger on a
         // FRESH jump press, not a buffered one (a press made just before landing or
@@ -207,6 +214,7 @@ namespace Celeste.Entities
             // Consume one flap on entry.
             kirbyFlapCount = Math.Max(0, kirbyFlapCount - 1);
             kirbyFlapScaleTimer = KirbyFlapScaleTime;
+            kirbyFloatDurationTimer = KirbyFloatMaxDuration;
 
             // Initial upward kick -- preserves stronger upward momentum so
             // jump/dash height carries into the float instead of being clipped.
@@ -247,6 +255,14 @@ namespace Celeste.Entities
 
             // Gentle float gravity -- drifts slowly downward.
             player.Speed.Y = Calc.Approach(player.Speed.Y, KirbyFloatFallSpeed, KirbyFloatGravity * Engine.DeltaTime);
+
+            // Hold-time cap: forces an exit back to normal falling once expired,
+            // regardless of remaining flaps or held input -- landing or dashing
+            // from there on is just the normal next move, same as every other
+            // float exit below.
+            kirbyFloatDurationTimer -= Engine.DeltaTime;
+            if (kirbyFloatDurationTimer <= 0f)
+                return global::Celeste.Player.StNormal;
 
             // Fast-fall: hold down to puff out the air and drop out of float.
             if (Input.MoveY.Value > 0)
@@ -314,6 +330,13 @@ namespace Celeste.Entities
         private const float KirbyInhaleRange = 80f;
         private const float KirbyInhalePullSpeed = 200f;
         private const float KirbyInhaleTime = 1.5f;
+        // Pull strength at max range used to taper all the way to zero (dist ==
+        // KirbyInhaleRange -> 0 pull), so a target caught right at the edge of
+        // range barely moved at first and often couldn't close the gap before
+        // KirbyInhaleTime ran out -- the practical usable range was much smaller
+        // than KirbyInhaleRange implied. This floors the falloff instead of
+        // letting it hit zero.
+        private const float KirbyInhaleMinPullFraction = 0.4f;
         private const int KirbyInhaleTendrilCount = 5;
 
         private float kirbyInhaleTimer;
@@ -441,7 +464,8 @@ namespace Celeste.Entities
 
                 // pull it toward the mouth
                 Vector2 pullDir = (player.Center - entity.Center).SafeNormalize();
-                float pullStrength = KirbyInhalePullSpeed * (1f - dist / KirbyInhaleRange);
+                float pullFraction = 1f - (1f - KirbyInhaleMinPullFraction) * (dist / KirbyInhaleRange);
+                float pullStrength = KirbyInhalePullSpeed * pullFraction;
 
                 if (entity is Actor actor)
                 {
@@ -639,18 +663,6 @@ namespace Celeste.Entities
             base.EntityAdded(scene);
             level = scene as Level;
 
-            // Deferred: adding components here would mutate player.Components while
-            // Entity.Add(this component) is still processing it -- crashes with
-            // "Collection was modified; enumeration operation may not execute".
-            var sprite = KirbySprite;
-            var shoes = Shoes;
-            var hostPlayer = player;
-            scene.OnEndOfFrame += () =>
-            {
-                hostPlayer.Add(sprite);
-                hostPlayer.Add(shoes);
-            };
-
             if (level != null)
             {
                 var healthManager = K_PlayerHealthManager.GetOrCreate(level, MaxHealth);
@@ -660,18 +672,6 @@ namespace Celeste.Entities
 
         public override void EntityRemoved(Scene scene)
         {
-            var sprite = KirbySprite;
-            var shoes = Shoes;
-            var hostPlayer = player;
-            if (scene != null && hostPlayer != null)
-            {
-                scene.OnEndOfFrame += () =>
-                {
-                    hostPlayer.Remove(sprite);
-                    hostPlayer.Remove(shoes);
-                };
-            }
-
             K_PlayerHealthManager.Instance?.DisableKirbyMode();
 
             base.EntityRemoved(scene);
@@ -680,10 +680,16 @@ namespace Celeste.Entities
         public override void Update()
         {
             base.Update();
-            // All per-frame physics/ability logic runs via KirbyPlayerHooks'
+            // KirbySprite/Shoes are never added to player.Components (they're drawn
+            // manually by RenderKirbyOverlay/KirbyShoes.Render, see the Visible=false
+            // comment in Added()), so Monocle never advances KirbySprite's animation
+            // timer on its own -- without this call every Kirby animation freezes on
+            // its first frame instead of playing like Madeline's own sprite does.
+            KirbySprite?.Update();
+            // All other per-frame physics/ability logic runs via KirbyPlayerHooks'
             // On.Celeste.Player.Update/NormalUpdate hooks (PreUpdate/PostUpdate/
             // CheckFloatEntry/CheckInhaleEntry) and the StateMachine callbacks
-            // registered in Added() -- nothing to do here.
+            // registered in Added() -- nothing else to do here.
         }
 
         /// <summary>
@@ -725,7 +731,12 @@ namespace Celeste.Entities
             KirbySprite.RenderPosition = player.Sprite.RenderPosition;
             KirbySprite.Scale = player.Sprite.Scale;
             KirbySprite.Rotation = player.Sprite.Rotation;
-            KirbySprite.Color = player.Sprite.Color;
+            // player.Sprite.Color is White except during a flash effect (hurt,
+            // bounce, etc) -- same convention vanilla's own PlayerHair uses to
+            // decide when to show its dash-tier color vs. the flash color.
+            KirbySprite.Color = player.Sprite.Color == Color.White
+                ? KirbyDashColors.GetColor(player.Dashes, level?.TimeActive ?? 0f)
+                : player.Sprite.Color;
             KirbySprite.Render();
         }
     }

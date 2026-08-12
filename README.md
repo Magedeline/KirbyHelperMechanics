@@ -51,11 +51,23 @@ dotnet build KirbyHelperMechanics.csproj
 ```
 
 Targets `net8.0`. If a Celeste install isn't found three directories up
-(`..\..\..\Celeste.dll`, i.e. this repo living inside `Mods/<name>/Source`),
+(`../../../Celeste.dll`, i.e. this repo living inside `Mods/<name>/Source`),
 the build falls back to the stripped reference assemblies in
 `Source/lib-stripped/`. A post-build step copies the built DLL/PDB into
 `bin/`, which is what `everest.yaml` points Everest at — building without
 that copy step running will make Everest report the mod assembly as missing.
+
+## Packaging a release zip
+
+```
+pwsh ./publish.ps1
+```
+
+Builds in `Release` and writes `dist/KirbyHelperMechanics.zip` with
+`everest.yaml` at the zip root (not wrapped in an extra folder) alongside
+`bin/`, `Graphics/`, `Loenn/`, and `Audio/` — the exact layout Everest/Olympus
+expect for a drag-and-drop install. `Source/`, `Source/lib-stripped/`, and
+other dev-only files are left out.
 
 ## Project layout
 

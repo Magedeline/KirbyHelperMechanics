@@ -17,9 +17,7 @@ namespace Celeste.Projectiles
         private readonly Vector2 velocity;
         private readonly KirbyPlayerController owner;
         private readonly int damage;
-        private float lifetime;
         private float rotation;
-        private const float MaxLifetime = 3f;
 
         public PlayerStarBullet(Vector2 position, Vector2 velocity, KirbyPlayerController owner, int damage)
             : base(position)
@@ -36,15 +34,14 @@ namespace Celeste.Projectiles
             base.Update();
 
             Position += velocity * Engine.DeltaTime;
-            lifetime += Engine.DeltaTime;
             rotation += Engine.DeltaTime * 8f;
 
             // Trail
             if (Scene.OnInterval(0.04f))
                 (Scene as Level)?.ParticlesFG.Emit(ParticleTypes.SparkyDust, Position);
 
-            // Wall or timeout
-            if (lifetime > MaxLifetime || CollideCheck<Solid>())
+            // Travels indefinitely until it physically hits something -- no timeout.
+            if (CollideCheck<Solid>())
             {
                 Burst();
                 RemoveSelf();

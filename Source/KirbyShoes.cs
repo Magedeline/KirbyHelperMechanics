@@ -6,12 +6,13 @@ namespace Celeste.Entities
     /// <summary>
     /// Renders a pair of Kirby-style shoes at the player's feet via the
     /// "kirby_shoes" sprite bank entry (Graphics/k_sprites.xml), replacing
-    /// the hat+scarf accent DZ uses. Color mirrors the hair dash-tier color
-    /// system so all existing dash, Kirby-pink, and combat colors still apply.
+    /// the hat+scarf accent DZ uses. Tinted per Player.Dashes via
+    /// KirbyDashColors, mirroring vanilla hair's own "stay the flash color
+    /// during a flash effect, otherwise use the dash-tier color" convention.
     /// </summary>
     public class KirbyShoes : Component
     {
-        /// <summary>Current shoe tint. Set each frame from UpdateHair.</summary>
+        /// <summary>Current shoe tint. Recomputed every frame in Render() from the player's dash count.</summary>
         public Color Color
         {
             get => sprite?.Color ?? Color.White;
@@ -36,7 +37,6 @@ namespace Celeste.Entities
             if (GFX.SpriteBank != null && GFX.SpriteBank.Has("kirby_shoes"))
             {
                 sprite = GFX.SpriteBank.Create("kirby_shoes");
-                sprite.Color = Calc.HexToColor("ff99cc");
             }
         }
 
@@ -47,6 +47,9 @@ namespace Celeste.Entities
 
             sprite.RenderPosition = player.Sprite.RenderPosition;
             sprite.FlipX = player.Facing == Facings.Left;
+            sprite.Color = player.Sprite.Color == Color.White
+                ? KirbyDashColors.GetColor(player.Dashes, (player.Scene as Level)?.TimeActive ?? 0f)
+                : player.Sprite.Color;
             sprite.Render();
         }
     }
