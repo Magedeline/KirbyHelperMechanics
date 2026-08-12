@@ -35,6 +35,7 @@ namespace Celeste.Mod.KirbyHelperMechanics
             On.Celeste.Player.DashUpdate += OnDashUpdate;
             On.Celeste.Player.StartDash += OnStartDash;
             On.Celeste.Player.Die += OnPlayerDie;
+            On.Celeste.TrailManager.Add_Vector2_Image_PlayerHair_Vector2_Color_int_float_bool_bool += OnTrailManagerAdd;
             PlayerSelectionManager.OnPlayerSelectionChanged += OnPlayerSelectionChanged;
 
             KirbyPlayerController.Load();
@@ -53,6 +54,7 @@ namespace Celeste.Mod.KirbyHelperMechanics
             On.Celeste.Player.DashUpdate -= OnDashUpdate;
             On.Celeste.Player.StartDash -= OnStartDash;
             On.Celeste.Player.Die -= OnPlayerDie;
+            On.Celeste.TrailManager.Add_Vector2_Image_PlayerHair_Vector2_Color_int_float_bool_bool -= OnTrailManagerAdd;
             PlayerSelectionManager.OnPlayerSelectionChanged -= OnPlayerSelectionChanged;
 
             KirbyPlayerController.Unload();
@@ -262,6 +264,31 @@ namespace Celeste.Mod.KirbyHelperMechanics
             int result = orig(self);
             self.Get<KirbyPlayerController>()?.GrantDashFlapRefill();
             return result;
+        }
+
+        /// <summary>
+        /// Swaps the Image a dash/wall-jump/dream-dash after-image snapshot is
+        /// built from when it belongs to a Kirby-controlled Player. Vanilla's own
+        /// TrailManager.Add overloads resolve the source image via
+        /// entity.Get&lt;PlayerSprite&gt;(), which only ever finds the real Sprite
+        /// -- see KirbyPlayerController.PrepareKirbySpriteForTrail for why that's
+        /// wrong for Kirby. Also drops the hair snapshot: TrailManager renders it
+        /// unconditionally regardless of PlayerHair.Visible, and Kirby's sprite
+        /// already includes its own "hair" as part of the body art.
+        /// </summary>
+        private static global::Celeste.TrailManager.Snapshot OnTrailManagerAdd(On.Celeste.TrailManager.orig_Add_Vector2_Image_PlayerHair_Vector2_Color_int_float_bool_bool orig, Vector2 position, Image sprite, global::Celeste.PlayerHair hair, Vector2 scale, Color color, int depth, float duration, bool frozenUpdate, bool useRawDeltaTime)
+        {
+            if (sprite?.Entity is global::Celeste.Player player)
+            {
+                Sprite kirbySprite = player.Get<KirbyPlayerController>()?.PrepareKirbySpriteForTrail();
+                if (kirbySprite != null)
+                {
+                    sprite = kirbySprite;
+                    hair = null;
+                }
+            }
+
+            return orig(position, sprite, hair, scale, color, depth, duration, frozenUpdate, useRawDeltaTime);
         }
     }
 }

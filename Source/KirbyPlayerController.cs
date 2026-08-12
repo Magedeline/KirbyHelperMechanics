@@ -817,6 +817,19 @@ namespace Celeste.Entities
             if (KirbySprite == null)
                 return;
 
+            SyncKirbySpriteFromVanilla();
+            KirbySprite.Render();
+        }
+
+        /// <summary>
+        /// Mirrors KirbySprite's animation id, transform, and tint from the real
+        /// (hidden) vanilla Sprite. Shared by <see cref="RenderKirbyOverlay"/>
+        /// (per-frame draw) and <see cref="PrepareKirbySpriteForTrail"/> (dash/
+        /// wall-jump/dream-dash after-image capture), which both need KirbySprite
+        /// to reflect vanilla's current frame before it's used.
+        /// </summary>
+        private void SyncKirbySpriteFromVanilla()
+        {
             if (!InKirbyAbilityState)
             {
                 string vanillaId = player.Sprite.CurrentAnimationID;
@@ -838,7 +851,26 @@ namespace Celeste.Entities
             // it into a solid-color blob. Only mirror vanilla's own flash-effect
             // tinting (hurt/bounce/etc), never apply KirbyDashColors here.
             KirbySprite.Color = player.Sprite.Color;
-            KirbySprite.Render();
+        }
+
+        /// <summary>
+        /// Called from KirbyPlayerHooks' TrailManager.Add hook so a dash/wall-jump/
+        /// dream-dash after-image snapshot captures Kirby's current frame instead
+        /// of the real vanilla Sprite. TrailManager.Add resolves its source image
+        /// via entity.Get&lt;PlayerSprite&gt;(), which only ever finds the real
+        /// (hidden) Sprite -- KirbySprite is deliberately never added as a
+        /// Component (see the Visible=false comment in Added()), so without this
+        /// every trail after-image renders Madeline's frame instead of Kirby's.
+        /// Returns null when there's no KirbySprite to swap in, so the caller can
+        /// fall back to vanilla's own resolved image untouched.
+        /// </summary>
+        internal Sprite PrepareKirbySpriteForTrail()
+        {
+            if (KirbySprite == null)
+                return null;
+
+            SyncKirbySpriteFromVanilla();
+            return KirbySprite;
         }
     }
 
