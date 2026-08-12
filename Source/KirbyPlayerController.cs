@@ -136,7 +136,10 @@ namespace Celeste.Entities
         #region Kirby Float (hover) -- ported from legacy K_Player.KirbyFloatBegin/Update/End
 
         private const float KirbyFloatSpeed = -35f;
-        private const float KirbyFloatFallSpeed = 18f;
+        // True hover: just holding Float without flapping again holds altitude
+        // instead of slowly sinking, so the approach target below is 0, not some
+        // positive sink speed.
+        private const float KirbyFloatFallSpeed = 0f;
         private const float KirbyFloatGravity = 45f;
         private const float KirbyFloatHSpeed = 80f;
         private const float KirbyFloatHAccel = 550f; // legacy: RunAccel(1000f) * .55f
@@ -144,14 +147,25 @@ namespace Celeste.Entities
         private const float KirbyAirPuffSpeed = 120f;
 
         // Total hold-time cap for a single float session, independent of flap
-        // charges -- without this a player can glide almost indefinitely at
-        // KirbyFloatFallSpeed once flaps run out, since that terminal speed is so
-        // low. Resets to full every time float is (re-)entered from grounded.
+        // charges -- without this a player could hover indefinitely once
+        // KirbyFloatFallSpeed became a true 0-sink hover. Resets to full every
+        // time float is (re-)entered from grounded.
         private const float KirbyFloatMaxDuration = 2.5f;
+
+        // Double jump's Jump() impulse (vanilla Speed.Y = -105) multiplied by
+        // this to make Kirby's mid-air jump noticeably stronger than a grounded one.
+        private const float KirbyDoubleJumpPower = 1.3f;
 
         private int kirbyFlapCount;
         private float kirbyFlapScaleTimer;
         private float kirbyFloatDurationTimer;
+
+        // One free mid-air jump (real Jump() impulse, not a Float hover), usable
+        // whenever Kirby is airborne without coyote/wall-jump options. Tracked
+        // separately from kirbyFlapCount -- Float is the flap-metered hover
+        // ability, this is a single discrete "double jump" -- and refills only
+        // on landing, same as flaps.
+        private bool kirbyDoubleJumpUsed;
 
         // Rising-edge jump detection: Kirby's air abilities must only trigger on a
         // FRESH jump press, not a buffered one (a press made just before landing or
@@ -176,10 +190,13 @@ namespace Celeste.Entities
         {
             jumpPressedFresh = Input.Jump.Check && !prevJumpCheck;
 
-            // Flaps fully refill while grounded, mirroring the legacy K_Player's
-            // per-frame "onGround -> reset to max" behavior.
+            // Flaps and the double jump fully refill while grounded, mirroring
+            // the legacy K_Player's per-frame "onGround -> reset to max" behavior.
             if (player.onGround)
+            {
                 kirbyFlapCount = KirbyHelperMechanicsModule.Settings?.KirbyMaxFloatJumps ?? 5;
+                kirbyDoubleJumpUsed = false;
+            }
         }
 
         internal void PostUpdate()
@@ -188,11 +205,16 @@ namespace Celeste.Entities
         }
 
         /// <summary>
-        /// Kirby Float's entry condition, checked from KirbyPlayerHooks'
-        /// On.Celeste.Player.NormalUpdate hook BEFORE orig(self) runs -- entry has
-        /// to preempt vanilla's own jump/wall-jump handling of the same button
-        /// press, not react after the fact. Consumes the jump buffer on success so
-        /// vanilla's own jump handling in orig(self) never also sees this press.
+        /// Kirby Float's entry condition, checked from KirbyPlayerHooks' both
+        /// On.Celeste.Player.NormalUpdate hook (normal airborne jump press) and
+        /// On.Celeste.Player.DashUpdate hook (jumping out of an in-air dash --
+        /// vanilla's own DashUpdate only lets you jump-cancel a dash while
+        /// grounded or against a wall, never in open air, so this is what lets
+        /// Kirby jump/float out of a dash mid-air too) -- BEFORE orig(self) runs
+        /// in both cases, since entry has to preempt vanilla's own jump/wall-jump
+        /// handling of the same button press, not react after the fact. Consumes
+        /// the jump buffer on success so vanilla's own jump handling in orig(self)
+        /// never also sees this press.
         /// </summary>
         internal bool CheckFloatEntry()
         {
@@ -207,6 +229,50 @@ namespace Celeste.Entities
 
             Input.Jump.ConsumeBuffer();
             return true;
+        }
+
+        /// <summary>
+        /// Entry condition for Kirby's one-charge mid-air double jump -- a real
+        /// <see cref="global::Celeste.Player.Jump"/> impulse (not a Float hover),
+        /// usable once per airtime before Float's flap-metered hover takes over.
+        /// Checked from the same two hooks as <see cref="CheckFloatEntry"/> and
+        /// BEFORE it, so the first airborne jump press is a genuine jump and only
+        /// later presses spend flaps entering Float. <see cref="global::Celeste.Player.Jump"/>
+        /// consumes the jump buffer itself, so no separate ConsumeBuffer call is
+        /// needed here.
+        /// </summary>
+        internal bool CheckDoubleJumpEntry()
+        {
+            if (player.onGround || player.Holding != null)
+                return false;
+            if (!Input.Jump.Pressed || !jumpPressedFresh || player.jumpGraceTimer > 0f)
+                return false;
+            if (player.WallJumpCheck(1) || player.WallJumpCheck(-1))
+                return false;
+            if (kirbyDoubleJumpUsed)
+                return false;
+
+            kirbyDoubleJumpUsed = true;
+            player.Jump();
+            // Jump() sets Speed.Y to vanilla's fixed -105 -- scale it up so
+            // Kirby's mid-air jump has noticeably more power than a grounded one.
+            player.Speed.Y *= KirbyDoubleJumpPower;
+            return true;
+        }
+
+        /// <summary>
+        /// Called from KirbyPlayerHooks' On.Celeste.Player.StartDash hook after
+        /// every dash (ground or air, including Float's own dash-cancel in
+        /// KirbyFloatUpdate) -- refills one flap, capped at max. A no-op while
+        /// grounded since PreUpdate already keeps flaps topped off there; the
+        /// effect only matters in the air, which is also exactly what makes
+        /// dashing out of Float feel like it grants an extra jump instead of
+        /// spending one of the flaps Float itself already charges on entry.
+        /// </summary>
+        internal void GrantDashFlapRefill()
+        {
+            int max = KirbyHelperMechanicsModule.Settings?.KirbyMaxFloatJumps ?? 5;
+            kirbyFlapCount = Math.Min(max, kirbyFlapCount + 1);
         }
 
         private void KirbyFloatBegin()
@@ -253,7 +319,9 @@ namespace Celeste.Entities
             // Horizontal movement -- slightly floatier than normal.
             player.Speed.X = Calc.Approach(player.Speed.X, KirbyFloatHSpeed * player.moveX, KirbyFloatHAccel * Engine.DeltaTime);
 
-            // Gentle float gravity -- drifts slowly downward.
+            // True hover -- approaches 0 vertical speed (KirbyFloatFallSpeed),
+            // so just holding Float without flapping again holds altitude
+            // instead of sinking.
             player.Speed.Y = Calc.Approach(player.Speed.Y, KirbyFloatFallSpeed, KirbyFloatGravity * Engine.DeltaTime);
 
             // Hold-time cap: forces an exit back to normal falling once expired,

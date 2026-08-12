@@ -32,6 +32,8 @@ namespace Celeste.Mod.KirbyHelperMechanics
             On.Celeste.Player.Render += OnPlayerRender;
             On.Celeste.Player.Update += OnPlayerUpdate;
             On.Celeste.Player.NormalUpdate += OnNormalUpdate;
+            On.Celeste.Player.DashUpdate += OnDashUpdate;
+            On.Celeste.Player.StartDash += OnStartDash;
             On.Celeste.Player.Die += OnPlayerDie;
             PlayerSelectionManager.OnPlayerSelectionChanged += OnPlayerSelectionChanged;
 
@@ -48,6 +50,8 @@ namespace Celeste.Mod.KirbyHelperMechanics
             On.Celeste.Player.Render -= OnPlayerRender;
             On.Celeste.Player.Update -= OnPlayerUpdate;
             On.Celeste.Player.NormalUpdate -= OnNormalUpdate;
+            On.Celeste.Player.DashUpdate -= OnDashUpdate;
+            On.Celeste.Player.StartDash -= OnStartDash;
             On.Celeste.Player.Die -= OnPlayerDie;
             PlayerSelectionManager.OnPlayerSelectionChanged -= OnPlayerSelectionChanged;
 
@@ -185,11 +189,53 @@ namespace Celeste.Mod.KirbyHelperMechanics
             {
                 if (kpc.CheckInhaleEntry())
                     return kpc.StKirbyInhale;
+                if (kpc.CheckDoubleJumpEntry())
+                    return global::Celeste.Player.StNormal;
                 if (kpc.CheckFloatEntry())
                     return kpc.StKirbyFloat;
             }
 
             return orig(self);
+        }
+
+        /// <summary>
+        /// Same idea as <see cref="OnNormalUpdate"/>, but for the Dash state --
+        /// vanilla's own DashUpdate only lets Input.Jump cancel a dash early
+        /// while grounded (SuperJump) or against a wall (SuperWallJump), never
+        /// in open air, so without this a jump press mid-air-dash is just
+        /// silently ignored until the dash times out on its own. Checked BEFORE
+        /// orig(self) for the same preempt-the-same-button-press reason as
+        /// OnNormalUpdate; falls through to unmodified vanilla DashUpdate
+        /// (ground/wall jump-cancel, curve-dash assist, dash particles, ...)
+        /// whenever neither check fires.
+        /// </summary>
+        private static int OnDashUpdate(On.Celeste.Player.orig_DashUpdate orig, global::Celeste.Player self)
+        {
+            var kpc = self.Get<KirbyPlayerController>();
+            if (kpc != null)
+            {
+                if (kpc.CheckDoubleJumpEntry())
+                    return global::Celeste.Player.StNormal;
+                if (kpc.CheckFloatEntry())
+                    return kpc.StKirbyFloat;
+            }
+
+            return orig(self);
+        }
+
+        /// <summary>
+        /// Refills one Kirby flap after every dash actually starts (ground or
+        /// air, including Float's own dash-cancel) -- see
+        /// KirbyPlayerController.GrantDashFlapRefill for why this only matters
+        /// in the air. Runs after orig() so DashDir/Speed are already set up by
+        /// the time the refill happens, though ordering doesn't actually matter
+        /// here since the two touch unrelated state.
+        /// </summary>
+        private static int OnStartDash(On.Celeste.Player.orig_StartDash orig, global::Celeste.Player self)
+        {
+            int result = orig(self);
+            self.Get<KirbyPlayerController>()?.GrantDashFlapRefill();
+            return result;
         }
     }
 }
