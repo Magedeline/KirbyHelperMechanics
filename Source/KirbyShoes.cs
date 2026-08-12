@@ -1,5 +1,6 @@
 using Microsoft.Xna.Framework;
 using Monocle;
+using Celeste.Mod.KirbyHelperMechanics;
 
 namespace Celeste.Entities
 {
@@ -29,14 +30,16 @@ namespace Celeste.Entities
         public KirbyShoes(global::Celeste.Player player) : base(active: true, visible: false)
         {
             this.player = player;
-            // "kirby_shoes" lives only in Graphics/k_sprites.xml (no vanilla-Sprites.xml
-            // fallback like kirby_player_ext has), so if this component gets built before
-            // KirbyHelperMechanicsModule.LoadContent has merged that bank in, GFX.SpriteBank
-            // won't have the id yet. Guard instead of crashing the whole room load; the
-            // shoes just don't render for that instance (same pattern as BossActor.cs).
-            if (GFX.SpriteBank != null && GFX.SpriteBank.Has("kirby_shoes"))
+            // "kirby_shoes" lives only in Graphics/k_sprites.xml, read from our own
+            // dedicated KirbySpriteBank (see its doc comment in
+            // KirbyHelperMechanicsModule) rather than GFX.SpriteBank. Guard instead
+            // of crashing the whole room load if this component somehow gets built
+            // before LoadContent has run; the shoes just don't render for that
+            // instance (same pattern as BossActor.cs).
+            var bank = KirbyHelperMechanicsModule.KirbySpriteBank;
+            if (bank != null && bank.Has("kirby_shoes"))
             {
-                sprite = GFX.SpriteBank.Create("kirby_shoes");
+                sprite = bank.Create("kirby_shoes");
             }
         }
 

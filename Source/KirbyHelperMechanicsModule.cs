@@ -41,6 +41,19 @@ namespace Celeste.Mod.KirbyHelperMechanics
         // when the matching *Loaded flag below is true.
         public static bool FactoryHelperLoaded { get; private set; }
 
+        /// <summary>
+        /// Dedicated sprite bank built from Graphics/k_sprites.xml, holding
+        /// kirby_player_ext/kirby_shoes/etc. Kept as our own instance rather
+        /// than merged into the shared GFX.SpriteBank, because GFX.SpriteBank
+        /// is still null when LoadContent runs (Everest calls mod LoadContent
+        /// hooks before Celeste.GFX.Load() assigns it -- confirmed by direct
+        /// testing, not just reading the "GFX LOAD" timing log). Reading our
+        /// own ids from here instead of GFX.SpriteBank also sidesteps any
+        /// future collision with DZ's own colliding "kirby_player_ext"
+        /// definition, without needing to race it for last-write-wins.
+        /// </summary>
+        public static Monocle.SpriteBank KirbySpriteBank { get; private set; }
+
         public KirbyHelperMechanicsModule()
         {
             Instance = this;
@@ -77,20 +90,13 @@ namespace Celeste.Mod.KirbyHelperMechanics
             // merges multiple mods' overrides of the SAME vanilla content path --
             // for a mod-only path like "Graphics/k_sprites.xml" (never a vanilla
             // file) it just parses and returns an XmlDocument with no side
-            // effects. Discarding that return value, as this used to do, never
-            // registered kirby_player_ext/kirby_shoes/etc into GFX.SpriteBank at
-            // all; on any setup where DZ (which defines its own colliding
-            // kirby_player_ext) isn't installed, GFX.SpriteBank.Create throws
-            // "Missing animation name in SpriteData" the first time Kirby is
-            // selected. Building our own SpriteBank from the file and merging its
-            // entries into the real GFX.SpriteBank is what actually registers
-            // them -- and per the file's own header comment, doing this in
-            // LoadContent (after every mod's Load(), i.e. after Everest's own
-            // Graphics/Sprites.xml auto-merge pass) makes this mod's entries win
-            // over DZ's regardless of mod load order.
-            var kirbySpriteBank = new Monocle.SpriteBank(GFX.Game, "Graphics/k_sprites.xml");
-            foreach (var entry in kirbySpriteBank.SpriteData)
-                GFX.SpriteBank.SpriteData[entry.Key] = entry.Value;
+            // effects, so calling it alone (as this used to do) never registered
+            // anything anywhere. Constructing our own SpriteBank directly from
+            // the file, and keeping it as KirbySpriteBank instead of merging into
+            // GFX.SpriteBank (which is still null at this point -- see the field
+            // doc comment), is what actually makes kirby_player_ext/kirby_shoes/
+            // etc available.
+            KirbySpriteBank = new Monocle.SpriteBank(GFX.Game, "Graphics/k_sprites.xml");
             // KirbyPlayerController rides the real vanilla Player, so it reads
             // global::Celeste.Player's own P_DashA/P_DashB/etc particle-type
             // statics directly -- no separate copy step needed here anymore.

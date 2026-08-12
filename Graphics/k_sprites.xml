@@ -278,7 +278,7 @@
       <Anim id="kirby_death" path="combat/death_" delay="0.08" />
     </kirby_player_ext>
 
-    <kirby_playback copy="player" path="characters/KHM/kirby_Playback/" />
+    <kirby_playback copy="kirby_player_ext" path="characters/KHM/kirby_Playback/" />
 
     <kirby_payphone path="cutscenes/KHM/kirby_payphone/" start="idle">
       <Justify x="0.5" y="1" />

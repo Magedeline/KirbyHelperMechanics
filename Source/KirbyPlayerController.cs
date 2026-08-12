@@ -116,7 +116,7 @@ namespace Celeste.Entities
             player.Hair.Visible = false;
             player.Hair.SimulateMotion = false;
 
-            KirbySprite = GFX.SpriteBank.Create(K_PlayerAnimIds.SpriteBankId);
+            KirbySprite = KirbyHelperMechanicsModule.KirbySpriteBank.Create(K_PlayerAnimIds.SpriteBankId);
             KirbySprite.Visible = false; // drawn manually by KirbyPlayerHooks' Render hook, not auto-rendered
             Shoes = new KirbyShoes(player);
 
