@@ -731,6 +731,11 @@ namespace Celeste.Entities
             KirbySprite.RenderPosition = player.Sprite.RenderPosition;
             KirbySprite.Scale = player.Sprite.Scale;
             KirbySprite.Rotation = player.Sprite.Rotation;
+            // Never copied before -- KirbySprite always rendered in its default
+            // orientation regardless of movement direction (Facings.Right = +1,
+            // Facings.Left = -1 in vanilla), same convention KirbyShoes already
+            // uses for its own sprite.
+            KirbySprite.FlipX = player.Facing == Facings.Left;
             // idle00.png etc are fully painted art (pink body, red cheeks/feet,
             // black eyes), not a white silhouette like vanilla hair or the shoes
             // sprite -- multiplying the whole body by a flat dash-tier color turns

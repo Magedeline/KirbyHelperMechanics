@@ -14,6 +14,7 @@
 // K_PlayerRespawnHooks used to have to re-create K_Player for, so no separate
 // Everest.Events.Level.OnLoadLevel hook is needed here.
 using Celeste.Entities;
+using Microsoft.Xna.Framework;
 using Monocle;
 
 namespace Celeste.Mod.KirbyHelperMechanics
@@ -31,6 +32,7 @@ namespace Celeste.Mod.KirbyHelperMechanics
             On.Celeste.Player.Render += OnPlayerRender;
             On.Celeste.Player.Update += OnPlayerUpdate;
             On.Celeste.Player.NormalUpdate += OnNormalUpdate;
+            On.Celeste.Player.Die += OnPlayerDie;
             PlayerSelectionManager.OnPlayerSelectionChanged += OnPlayerSelectionChanged;
 
             KirbyPlayerController.Load();
@@ -46,6 +48,7 @@ namespace Celeste.Mod.KirbyHelperMechanics
             On.Celeste.Player.Render -= OnPlayerRender;
             On.Celeste.Player.Update -= OnPlayerUpdate;
             On.Celeste.Player.NormalUpdate -= OnNormalUpdate;
+            On.Celeste.Player.Die -= OnPlayerDie;
             PlayerSelectionManager.OnPlayerSelectionChanged -= OnPlayerSelectionChanged;
 
             KirbyPlayerController.Unload();
@@ -140,6 +143,29 @@ namespace Celeste.Mod.KirbyHelperMechanics
             kpc?.PreUpdate();
             orig(self);
             kpc?.PostUpdate();
+        }
+
+        /// <summary>
+        /// Retints the death shatter effect from Madeline's hair color to
+        /// Kirby's own dash-tier color. PlayerDeadBody captures self.Hair.Color
+        /// into its own field at construction time (inside orig()) and passes
+        /// that captured value to DeathEffect -- it does not keep a live
+        /// reference to Hair -- so swapping the color immediately before orig()
+        /// runs and restoring it right after changes only the death effect's
+        /// tint, without touching any of vanilla's own death/respawn timing or
+        /// logic (which still runs completely unmodified via orig()).
+        /// </summary>
+        private static global::Celeste.PlayerDeadBody OnPlayerDie(On.Celeste.Player.orig_Die orig, global::Celeste.Player self, Vector2 direction, bool evenIfInvincible, bool registerDeathInStats)
+        {
+            var kpc = self.Get<KirbyPlayerController>();
+            if (kpc == null)
+                return orig(self, direction, evenIfInvincible, registerDeathInStats);
+
+            Color originalHairColor = self.Hair.Color;
+            self.Hair.Color = KirbyDashColors.GetColor(self.Dashes, (self.Scene as Level)?.TimeActive ?? 0f);
+            global::Celeste.PlayerDeadBody result = orig(self, direction, evenIfInvincible, registerDeathInStats);
+            self.Hair.Color = originalHairColor;
+            return result;
         }
 
         /// <summary>
