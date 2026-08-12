@@ -23,5 +23,22 @@ namespace Celeste.Mod.KirbyHelperMechanics
         [SettingName("modoptions_kirbyhelpermechanics_spitpuffbutton")]
         [DefaultButtonBinding(0, Keys.None)]
         public ButtonBinding KirbySpitButton { get; set; }
+
+        // Manual Kirby/Madeline swap, checked every Player.Update in
+        // KirbyPlayerHooks regardless of which character is currently active
+        // (unlike KirbyInhaleButton, this has to work even while playing as
+        // Madeline). Unbound by default, same reasoning as KirbySpitButton --
+        // players opt in via Mod Options -> Keyboard/Controller Config.
+        [SettingName("modoptions_kirbyhelpermechanics_toggleplayerbutton")]
+        [DefaultButtonBinding(0, Keys.None)]
+        public ButtonBinding ToggleKirbyMadelineButton { get; set; }
+
+        // Kirby's Inhale entry/hold button. Deliberately its own binding rather
+        // than reusing Input.Grab -- Grab is already overloaded with vanilla
+        // climb/hold-object behavior, so sharing it made Inhale fight climbing
+        // against walls. Unbound by default, same reasoning as KirbySpitButton.
+        [SettingName("modoptions_kirbyhelpermechanics_inhalebutton")]
+        [DefaultButtonBinding(0, Keys.None)]
+        public ButtonBinding KirbyInhaleButton { get; set; }
     }
 }

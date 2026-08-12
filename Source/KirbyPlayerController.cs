@@ -412,9 +412,17 @@ namespace Celeste.Entities
         private Vector2[] kirbyInhaleTendrils;
 
         /// <summary>
+        /// Kirby's own bindable Inhale button (Mod Options -> Keyboard/Controller
+        /// Config) -- deliberately NOT Input.Grab, which is already overloaded
+        /// with vanilla climb/hold-object behavior and made Inhale fight
+        /// climbing against walls when they shared a button.
+        /// </summary>
+        private static ButtonBinding InhaleButton => KirbyHelperMechanicsModule.Settings?.KirbyInhaleButton;
+
+        /// <summary>
         /// Kirby Inhale's entry condition, checked from KirbyPlayerHooks'
         /// On.Celeste.Player.NormalUpdate hook BEFORE orig(self) runs, same reason
-        /// as <see cref="CheckFloatEntry"/>. Ducking and up+grab are excluded to
+        /// as <see cref="CheckFloatEntry"/>. Ducking and up+inhale are excluded to
         /// mirror the legacy priority ladder, which reserved those combos for
         /// Slide Tackle / Counter Stance -- both out of scope for this port, but
         /// excluding them here keeps Inhale's own trigger condition unchanged if
@@ -422,14 +430,14 @@ namespace Celeste.Entities
         /// </summary>
         internal bool CheckInhaleEntry()
         {
-            if (!Input.Grab.Pressed || player.Holding != null)
+            if (InhaleButton == null || !InhaleButton.Pressed || player.Holding != null)
                 return false;
             if (!player.onGround || player.Ducking)
                 return false;
             if (Input.MoveY.Value == -1)
                 return false;
 
-            Input.Grab.ConsumeBuffer();
+            InhaleButton.ConsumeBuffer();
             return true;
         }
 
@@ -474,7 +482,7 @@ namespace Celeste.Entities
             UpdateKirbyInhaleTendrils(inhaleDir);
 
             // A successful capture chains straight into Star Spit -- no need to
-            // release and re-press Grab, so holding it through the whole
+            // release and re-press Inhale, so holding it through the whole
             // inhale-then-spit motion works as one continuous action.
             if (kirbyHasInhaledEnemy)
                 return StKirbyStarSpit;
@@ -489,7 +497,7 @@ namespace Celeste.Entities
                 }
             }
 
-            if (!Input.Grab.Check || kirbyInhaleTimer <= 0)
+            if (InhaleButton?.Check != true || kirbyInhaleTimer <= 0)
                 return global::Celeste.Player.StNormal;
 
             if (player.CanDash)
@@ -500,7 +508,7 @@ namespace Celeste.Entities
 
         private IEnumerator KirbyInhaleCoroutine()
         {
-            while (kirbyInhaleTimer > 0 && Input.Grab.Check)
+            while (kirbyInhaleTimer > 0 && InhaleButton?.Check == true)
                 yield return null;
 
             player.StateMachine.State = global::Celeste.Player.StNormal;

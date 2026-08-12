@@ -147,6 +147,32 @@ namespace Celeste.Mod.KirbyHelperMechanics
             kpc?.PreUpdate();
             orig(self);
             kpc?.PostUpdate();
+
+            CheckTogglePlayerButton(self);
+        }
+
+        /// <summary>
+        /// Manual Kirby/Madeline swap bound to
+        /// KirbyHelperMechanicsModuleSettings.ToggleKirbyMadelineButton. Checked
+        /// unconditionally on every Player.Update (unlike the Kirby-only ability
+        /// checks above) since it has to work while playing as Madeline too, not
+        /// just while a KirbyPlayerController is already attached. Mirrors
+        /// K_PlayerTrigger's own swap: SetLevelOverride so the swap is scoped to
+        /// the current level like a manual trigger touch, followed by a direct
+        /// SyncKirbyState call so it takes effect immediately rather than
+        /// waiting on the OnPlayerSelectionChanged event's own tracker lookup.
+        /// </summary>
+        private static void CheckTogglePlayerButton(global::Celeste.Player self)
+        {
+            if (KirbyHelperMechanicsModule.Settings?.ToggleKirbyMadelineButton?.Pressed != true)
+                return;
+
+            var next = PlayerSelectionManager.GetSelectedPlayer() == PlayerSelectionManager.PlayerType.Kirby
+                ? PlayerSelectionManager.PlayerType.Madeline
+                : PlayerSelectionManager.PlayerType.Kirby;
+
+            PlayerSelectionManager.SetLevelOverride(next);
+            SyncKirbyState(self);
         }
 
         /// <summary>
