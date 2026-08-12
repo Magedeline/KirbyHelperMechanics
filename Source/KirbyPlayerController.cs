@@ -136,10 +136,10 @@ namespace Celeste.Entities
         #region Kirby Float (hover) -- ported from legacy K_Player.KirbyFloatBegin/Update/End
 
         private const float KirbyFloatSpeed = -35f;
-        // True hover: just holding Float without flapping again holds altitude
-        // instead of slowly sinking, so the approach target below is 0, not some
-        // positive sink speed.
-        private const float KirbyFloatFallSpeed = 0f;
+        // A true 0-sink hover (briefly shipped) let Kirby camp motionless
+        // indefinitely -- this is a compromise: still a much gentler sink than
+        // the original 18f, but no longer a perfect stall.
+        private const float KirbyFloatFallSpeed = 7f;
         private const float KirbyFloatGravity = 45f;
         private const float KirbyFloatHSpeed = 80f;
         private const float KirbyFloatHAccel = 550f; // legacy: RunAccel(1000f) * .55f
@@ -147,18 +147,32 @@ namespace Celeste.Entities
         private const float KirbyAirPuffSpeed = 120f;
 
         // Total hold-time cap for a single float session, independent of flap
-        // charges -- without this a player could hover indefinitely once
-        // KirbyFloatFallSpeed became a true 0-sink hover. Resets to full every
-        // time float is (re-)entered from grounded.
-        private const float KirbyFloatMaxDuration = 2.5f;
+        // charges. Shortened from an earlier 2.5f alongside the FallSpeed nerf
+        // above -- together they keep even a maxed-flap hover from being able
+        // to camp in place for long. Resets to full every time float is
+        // (re-)entered from grounded.
+        private const float KirbyFloatMaxDuration = 1.5f;
 
         // Double jump's Jump() impulse (vanilla Speed.Y = -105) multiplied by
         // this to make Kirby's mid-air jump noticeably stronger than a grounded one.
         private const float KirbyDoubleJumpPower = 1.3f;
 
+        // Cap on the progressive flap cost in KirbyFloatBegin (see
+        // kirbyFloatEntriesThisAirtime) -- without a cap, a large
+        // KirbyMaxFloatJumps setting would make each successive re-entry cost
+        // more and more indefinitely.
+        private const int KirbyFloatMaxEntryCost = 3;
+
         private int kirbyFlapCount;
         private float kirbyFlapScaleTimer;
         private float kirbyFloatDurationTimer;
+
+        // Counts Float (re-)entries since the last time Kirby touched ground --
+        // KirbyFloatBegin scales its flap cost off this, so chaining
+        // dash-cancel-then-refloat (dash refills a flap via
+        // GrantDashFlapRefill, then re-entering Float spends it) can't be
+        // looped indefinitely to stall in the air for free.
+        private int kirbyFloatEntriesThisAirtime;
 
         // One free mid-air jump (real Jump() impulse, not a Float hover), usable
         // whenever Kirby is airborne without coyote/wall-jump options. Tracked
@@ -196,6 +210,7 @@ namespace Celeste.Entities
             {
                 kirbyFlapCount = KirbyHelperMechanicsModule.Settings?.KirbyMaxFloatJumps ?? 5;
                 kirbyDoubleJumpUsed = false;
+                kirbyFloatEntriesThisAirtime = 0;
             }
         }
 
@@ -277,8 +292,13 @@ namespace Celeste.Entities
 
         private void KirbyFloatBegin()
         {
-            // Consume one flap on entry.
-            kirbyFlapCount = Math.Max(0, kirbyFlapCount - 1);
+            // Progressive flap cost: the Nth Float entry since last touching
+            // ground costs N flaps (capped) -- a first entry still costs the
+            // usual 1, but re-entering after a dash-cancel (which itself
+            // refills a flap via GrantDashFlapRefill) costs more each time, so
+            // that loop can't be chained to stall in the air indefinitely.
+            kirbyFloatEntriesThisAirtime = Math.Min(kirbyFloatEntriesThisAirtime + 1, KirbyFloatMaxEntryCost);
+            kirbyFlapCount = Math.Max(0, kirbyFlapCount - kirbyFloatEntriesThisAirtime);
             kirbyFlapScaleTimer = KirbyFlapScaleTime;
             kirbyFloatDurationTimer = KirbyFloatMaxDuration;
 
@@ -319,9 +339,9 @@ namespace Celeste.Entities
             // Horizontal movement -- slightly floatier than normal.
             player.Speed.X = Calc.Approach(player.Speed.X, KirbyFloatHSpeed * player.moveX, KirbyFloatHAccel * Engine.DeltaTime);
 
-            // True hover -- approaches 0 vertical speed (KirbyFloatFallSpeed),
-            // so just holding Float without flapping again holds altitude
-            // instead of sinking.
+            // Gentle float gravity -- drifts slowly downward (KirbyFloatFallSpeed)
+            // rather than a true 0-sink hover, so camping in place still costs
+            // altitude over time.
             player.Speed.Y = Calc.Approach(player.Speed.Y, KirbyFloatFallSpeed, KirbyFloatGravity * Engine.DeltaTime);
 
             // Hold-time cap: forces an exit back to normal falling once expired,
