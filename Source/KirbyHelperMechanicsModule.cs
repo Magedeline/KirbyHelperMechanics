@@ -42,6 +42,16 @@ namespace Celeste.Mod.KirbyHelperMechanics
         public static bool FactoryHelperLoaded { get; private set; }
 
         /// <summary>
+        /// True if DZ is loaded. Doesn't gate a *type* reference (DZImports
+        /// already handles that half via ModInterop, so no JIT safety concern
+        /// here) -- just gates which FMOD event path KirbyPlayerController's
+        /// SFX calls use, since DZ's own Audio bank (loaded by DZ itself, not
+        /// duplicated here) is the only place event:/DZ/char/kirby/* actually
+        /// resolves to real audio. See KirbyPlayerController's PlayKirbySfx.
+        /// </summary>
+        public static bool DZLoaded { get; private set; }
+
+        /// <summary>
         /// Dedicated sprite bank built from Graphics/k_sprites.xml, holding
         /// kirby_player_ext/kirby_shoes/etc. Kept as our own instance rather
         /// than merged into the shared GFX.SpriteBank, because GFX.SpriteBank
@@ -64,6 +74,7 @@ namespace Celeste.Mod.KirbyHelperMechanics
             KirbyPlayerHooks.Load();
 
             FactoryHelperLoaded = Everest.Loader.DependencyLoaded(new EverestModuleMetadata { Name = "FactoryHelper", Version = new Version(1, 4, 1) });
+            DZLoaded = Everest.Loader.DependencyLoaded(new EverestModuleMetadata { Name = "DZ", Version = new Version(1, 0, 0) });
         }
 
         public override void Unload()

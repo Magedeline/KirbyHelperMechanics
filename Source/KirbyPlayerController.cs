@@ -29,6 +29,19 @@ namespace Celeste.Entities
         private global::Celeste.Player player;
         private Level level;
 
+        /// <summary>
+        /// Plays <paramref name="dzEvent"/> (one of DZ's real event:/DZ/char/kirby/*
+        /// SFX) when DZ is loaded -- its Audio bank is what actually resolves that
+        /// path, KirbyHelperMechanics does not ship its own copy of it -- and
+        /// falls back to <paramref name="madelineEvent"/> (a vanilla event, always
+        /// resolvable) otherwise, so playing as Kirby without DZ installed still
+        /// gets a sound instead of a silent Audio.Play miss.
+        /// </summary>
+        private void PlayKirbySfx(string dzEvent, string madelineEvent)
+        {
+            player.Play(KirbyHelperMechanicsModule.DZLoaded ? dzEvent : madelineEvent);
+        }
+
         #region Visuals
 
         /// <summary>Kirby sprite overlay, drawn in place of the vanilla Madeline sprite. See <see cref="KirbyPlayerHooks"/>'s Render hook.</summary>
@@ -311,10 +324,9 @@ namespace Celeste.Entities
             player.Sprite.Scale = new Vector2(1.3f, 0.75f);
             KirbySprite?.Play(K_PlayerAnimIds.Float);
 
-            // Reuses vanilla's own jump sound as the "puff" cue -- the legacy
-            // K_Player played a DZ-only "event:/DZ/char/kirby/jump" FMOD event that
-            // this standalone mod doesn't ship a bank for.
-            player.Play("event:/char/madeline/jump");
+            // "Puff" cue on float entry -- DZ's real Kirby jump SFX when DZ is
+            // installed, vanilla's jump sound as the fallback otherwise.
+            PlayKirbySfx("event:/DZ/char/kirby/jump", "event:/char/madeline/jump");
 
             level?.Particles.Emit(global::Celeste.Player.P_DashA, 3, player.BottomCenter, Vector2.UnitX * 4, Calc.Down);
         }
@@ -384,7 +396,7 @@ namespace Celeste.Entities
                     player.Speed.Y = KirbyFloatSpeed;
                     player.Sprite.Scale = new Vector2(1.35f, 0.7f);
 
-                    player.Play("event:/char/madeline/jump");
+                    PlayKirbySfx("event:/DZ/char/kirby/jump", "event:/char/madeline/jump");
                     level?.Particles.Emit(global::Celeste.Player.P_DashA, 2, player.BottomCenter, Vector2.UnitX * 4, Calc.Down);
                 }
             }
@@ -574,8 +586,9 @@ namespace Celeste.Entities
                 {
                     kirbyHasInhaledEnemy = true;
                     entity.RemoveSelf();
-                    // Best-effort vanilla substitute for the missing DZ audio bank -- see KirbyFloatBegin.
-                    player.Play("event:/char/madeline/grab");
+                    // DZ's dedicated inhale-swallow SFX when available; vanilla's
+                    // grab sound is the closest fallback otherwise.
+                    PlayKirbySfx("event:/DZ/char/kirby/inhale", "event:/char/madeline/grab");
                     player.Sprite.Scale = new Vector2(1.4f, .6f);
                     break;
                 }
@@ -721,8 +734,9 @@ namespace Celeste.Entities
             player.Speed.X = -kirbyStarSpitDir.X * ThrowRecoil;
 
             SlashFx.Burst(player.Center, kirbyStarSpitDir.Angle());
-            // Best-effort vanilla substitute for the missing DZ audio bank -- see KirbyFloatBegin.
-            player.Play("event:/char/madeline/dash_red_right");
+            // DZ's dedicated starspit SFX when available; vanilla's dash sound
+            // is the closest fallback otherwise.
+            PlayKirbySfx("event:/DZ/char/kirby/starspit", "event:/char/madeline/dash_red_right");
 
             yield return .15f;
 
