@@ -6,6 +6,7 @@
 // own EverestModule, so it no longer depends on DZ being installed, and it
 // no longer risks a Celeste.Mod.DZ.DZModule type collision if DZ happens to
 // be loaded in the same Everest process.
+using Celeste.Entities;
 using Microsoft.Xna.Framework.Input;
 
 namespace Celeste.Mod.KirbyHelperMechanics
@@ -16,6 +17,31 @@ namespace Celeste.Mod.KirbyHelperMechanics
         public bool GentleBreezeMode { get; set; } = false;
         public bool KirbyPlayerEnabled { get; set; } = true;
         public bool PlayerAutoSelect { get; set; } = false;
+
+        /// <summary>
+        /// Overrides KirbyPlayerEnabled's auto-generated OnOff menu item (Everest
+        /// looks for a Create{PropertyName}Entry(TextMenu, bool) method on this
+        /// class before falling back to its own reflection-based item -- see
+        /// EverestModule.CreateModMenuSection). The default item only calls the
+        /// property setter, so toggling "Kirby Player Enabled" from the pause
+        /// menu had no visible effect: PlayerSelectionManager.LoadDefaultFromSettings
+        /// (which reads this setting) only ever runs once, the first time its
+        /// singleton is created for a fresh game process. Driving
+        /// PlayerSelectionManager.SetDefaultPlayer directly here re-derives the
+        /// active selection immediately and (via its OnPlayerSelectionChanged
+        /// event, which KirbyPlayerHooks already subscribes to) syncs the live
+        /// Player's KirbyPlayerController the moment the toggle is flipped.
+        /// </summary>
+        public void CreateKirbyPlayerEnabledEntry(TextMenu menu, bool inGame)
+        {
+            menu.Add(new TextMenu.OnOff("Kirby Player Enabled", KirbyPlayerEnabled).Change(value =>
+            {
+                KirbyPlayerEnabled = value;
+                PlayerSelectionManager.SetDefaultPlayer(value
+                    ? PlayerSelectionManager.PlayerType.Kirby
+                    : PlayerSelectionManager.PlayerType.Madeline);
+            }));
+        }
 
         // Standalone "empty spit" cosmetic -- fires KirbyPuff directly, independent
         // of the Grab/Inhale state machine. Unbound by default (Mod Options ->
