@@ -33,3 +33,17 @@ Thank you for playtesting my modded game!
 This is just a scratch of the surface --
 for now, you can play as Kirby, with plenty of new entities to try out.
 See ya later!
+
+KHM_THEO=
+{anchor top}
+[THEO right normal]
+Well well well look who is here
+you must be playtesting it right?
+[none]
+...
+[THEO right serious]
+I know you are not here to play
+[THEO right normal]
+but at least your enjoying it
+[THEO right yolo]
+Good luck with your modding playtest journey
