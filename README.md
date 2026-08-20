@@ -73,9 +73,9 @@ other dev-only files are left out.
 
 ```
 Audio/           FMOD banks/events
-Graphics/        Sprites and atlases (incl. Graphics/k_sprites.xml, a custom
-                 sprite bank loaded explicitly by the mod at startup -- it
-                 must NOT be named Sprites.xml, since DZ ships its own
+Graphics/        Sprites and atlases (incl. Graphics/Pusheen2026/KHM/k_sprites.xml,
+                 a custom sprite bank loaded explicitly by the mod at startup --
+                 it must NOT be named Sprites.xml, since DZ ships its own
                  "kirby_player_ext" element that would silently win the
                  auto-merge otherwise)
 Loenn/           Map-editor (Lönn) entity/trigger plugins and forms

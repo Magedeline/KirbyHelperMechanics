@@ -7,7 +7,7 @@ kPlayerTrigger.placements = {
     data = {
         targetPlayer = "Kirby",
         spawnKPlayer = true,
-        revertOnLeave = false,
+        revertOnLeave = "Default",
         flag = "",
         clearFlagOnLeave = true,
         onlyOnce = false,
@@ -17,6 +17,12 @@ kPlayerTrigger.placements = {
 kPlayerTrigger.fieldInformation = {
     targetPlayer = {
         options = {"Kirby", "Madeline"},
+        editable = false
+    },
+    -- "Default" defers to the mod's "Default Revert Player On Trigger Leave"
+    -- setting in Mod Options rather than hardcoding true/false per placement.
+    revertOnLeave = {
+        options = {"Default", "True", "False"},
         editable = false
     }
 }

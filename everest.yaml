@@ -1,5 +1,5 @@
 - Name: KirbyHelperMechanics
-  Version: 1.2.5
+  Version: 2.0.0
   DLL: bin/KirbyHelperMechanics.dll
   Dependencies:
     - Name: Everest

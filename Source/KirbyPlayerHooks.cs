@@ -255,14 +255,19 @@ namespace Celeste.Mod.KirbyHelperMechanics
         /// Refills one Kirby flap after every dash actually starts (ground or
         /// air, including Float's own dash-cancel) -- see
         /// KirbyPlayerController.GrantDashFlapRefill for why this only matters
-        /// in the air. Runs after orig() so DashDir/Speed are already set up by
-        /// the time the refill happens, though ordering doesn't actually matter
-        /// here since the two touch unrelated state.
+        /// in the air. Also arms the wave dash buff watch (see
+        /// KirbyPlayerController.NotifyKirbyDashStarted) whenever the dash that
+        /// just started has a downward component. Runs after orig() so
+        /// DashDir/Speed are already set up by the time either call happens,
+        /// though ordering doesn't actually matter here since they touch
+        /// unrelated state.
         /// </summary>
         private static int OnStartDash(On.Celeste.Player.orig_StartDash orig, global::Celeste.Player self)
         {
             int result = orig(self);
-            self.Get<KirbyPlayerController>()?.GrantDashFlapRefill();
+            var kpc = self.Get<KirbyPlayerController>();
+            kpc?.GrantDashFlapRefill();
+            kpc?.NotifyKirbyDashStarted(self.DashDir);
             return result;
         }
 

@@ -49,7 +49,19 @@ namespace Celeste.Triggers
             // Defaults to Kirby so existing placements (which predate this field)
             // keep behaving exactly as before.
             targetPlayer = data.Enum("targetPlayer", PlayerSelectionManager.PlayerType.Kirby);
-            revertOnLeave = data.Bool("revertOnLeave", false);
+            // "revertOnLeave" is stored as a tri-state string ("Default"/"True"/
+            // "False") rather than a plain bool so mappers can leave it on
+            // "Default" and defer to KirbyHelperMechanicsModuleSettings.
+            // DefaultRevertPlayerOnTriggerLeave. Convert.ToString(bool) produces
+            // "True"/"False", so maps saved back when this field was a plain
+            // bool (or that never set it at all, predating the field) still
+            // resolve correctly here.
+            revertOnLeave = data.Attr("revertOnLeave", "Default") switch
+            {
+                "True" => true,
+                "False" => false,
+                _ => KirbyHelperMechanicsModule.Settings.DefaultRevertPlayerOnTriggerLeave,
+            };
         }
 
         public override void OnEnter(global::Celeste.Player player)

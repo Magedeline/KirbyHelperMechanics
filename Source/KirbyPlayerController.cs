@@ -30,16 +30,17 @@ namespace Celeste.Entities
         private Level level;
 
         /// <summary>
-        /// Plays <paramref name="dzEvent"/> (one of DZ's real event:/DZ/char/kirby/*
-        /// SFX) when DZ is loaded -- its Audio bank is what actually resolves that
-        /// path, KirbyHelperMechanics does not ship its own copy of it -- and
-        /// falls back to <paramref name="madelineEvent"/> (a vanilla event, always
-        /// resolvable) otherwise, so playing as Kirby without DZ installed still
-        /// gets a sound instead of a silent Audio.Play miss.
+        /// Plays a Kirby SFX from this mod's own bundled Audio/kirbyhelper_sfx.bank
+        /// (built from the Celestellaris FMOD project -- see GUIDs.txt at the mod
+        /// root for the full event list). No DZ dependency needed for these: the
+        /// bank ships with this mod and Everest auto-loads it, so the event
+        /// resolves regardless of what else is installed. Audio.Play silently
+        /// no-ops on an unresolvable path rather than throwing, so this is safe
+        /// even if a given event name turns out not to be in the bank.
         /// </summary>
-        private void PlayKirbySfx(string dzEvent, string madelineEvent)
+        private void PlayKirbySfx(string kirbyEvent)
         {
-            player.Play(KirbyHelperMechanicsModule.DZLoaded ? dzEvent : madelineEvent);
+            player.Play(kirbyEvent);
         }
 
         #region Visuals
@@ -206,6 +207,7 @@ namespace Celeste.Entities
         // frame, reading last frame's stale value.
         private bool prevJumpCheck;
         private bool jumpPressedFresh;
+        private bool kirbyWasOnGroundBeforeUpdate;
 
         /// <summary>Public accessor, e.g. for a future HUD or refill entity.</summary>
         public int KirbyFlapCount => kirbyFlapCount;
@@ -216,6 +218,7 @@ namespace Celeste.Entities
         internal void PreUpdate()
         {
             jumpPressedFresh = Input.Jump.Check && !prevJumpCheck;
+            kirbyWasOnGroundBeforeUpdate = player.onGround;
 
             // Flaps and the double jump fully refill while grounded, mirroring
             // the legacy K_Player's per-frame "onGround -> reset to max" behavior.
@@ -230,6 +233,7 @@ namespace Celeste.Entities
         internal void PostUpdate()
         {
             prevJumpCheck = Input.Jump.Check;
+            UpdateKirbyWaveDash();
         }
 
         /// <summary>
@@ -326,7 +330,7 @@ namespace Celeste.Entities
 
             // "Puff" cue on float entry -- DZ's real Kirby jump SFX when DZ is
             // installed, vanilla's jump sound as the fallback otherwise.
-            PlayKirbySfx("event:/DZ/char/kirby/jump", "event:/char/madeline/jump");
+            PlayKirbySfx("event:/Celestellaris/char/kirby/jump");
 
             level?.Particles.Emit(global::Celeste.Player.P_DashA, 3, player.BottomCenter, Vector2.UnitX * 4, Calc.Down);
         }
@@ -396,7 +400,7 @@ namespace Celeste.Entities
                     player.Speed.Y = KirbyFloatSpeed;
                     player.Sprite.Scale = new Vector2(1.35f, 0.7f);
 
-                    PlayKirbySfx("event:/DZ/char/kirby/jump", "event:/char/madeline/jump");
+                    PlayKirbySfx("event:/Celestellaris/char/kirby/jump");
                     level?.Particles.Emit(global::Celeste.Player.P_DashA, 2, player.BottomCenter, Vector2.UnitX * 4, Calc.Down);
                 }
             }
@@ -421,6 +425,106 @@ namespace Celeste.Entities
                 player.Facing = (Facings)player.moveX;
 
             return StKirbyFloat;
+        }
+
+        #endregion
+
+        #region Kirby Wave Dash Buff
+
+        // How long after a diagonal-down dash starts that touching ground while
+        // holding down still counts as a wave dash. Short enough to require the
+        // vanilla-style duck-cancel timing, long enough to be forgiving of a
+        // few frames of falling.
+        private const float KirbyWaveDashWindowTime = 0.15f;
+
+        // Extra horizontal speed granted per chained wave dash, before the cap.
+        private const float KirbyWaveDashSpeedPerChain = 45f;
+
+        // Hard cap on the total wave dash speed bonus -- without this, chaining
+        // wave dashes across a long room could accelerate Kirby indefinitely.
+        private const float KirbyWaveDashMaxBonusSpeed = 220f;
+
+        // Consecutive wave dashes are chained by chasing them back-to-back;
+        // spending this long on the ground without landing another one resets
+        // the chain back to zero.
+        private const float KirbyWaveDashChainResetTime = 0.5f;
+
+        private const int KirbyWaveDashMaxChain = 5;
+
+        private float kirbyWaveDashArmTimer;
+        private int kirbyWaveDashDashDirX;
+        private int kirbyWaveDashChain;
+        private float kirbyWaveDashChainTimer;
+
+        /// <summary>
+        /// Called from KirbyPlayerHooks' On.Celeste.Player.StartDash hook, after
+        /// GrantDashFlapRefill -- arms the wave dash window whenever the dash
+        /// that just started has a downward component (diagonal-down in either
+        /// horizontal direction, forward or reverse relative to facing both
+        /// work identically here).
+        /// </summary>
+        internal void NotifyKirbyDashStarted(Vector2 dashDir)
+        {
+            if (dashDir.X == 0 || dashDir.Y <= 0)
+                return;
+
+            kirbyWaveDashArmTimer = KirbyWaveDashWindowTime;
+            kirbyWaveDashDashDirX = Math.Sign(dashDir.X);
+        }
+
+        /// <summary>
+        /// Watches for the classic wave-dash input (duck-cancel the instant a
+        /// diagonal-down dash touches ground) and, if it lands within the armed
+        /// window, applies a stacking speed bonus instead of vanilla's usual
+        /// plain speed retention. Called from PostUpdate, once per frame, using
+        /// the ground-transition edge captured in PreUpdate.
+        /// </summary>
+        private void UpdateKirbyWaveDash()
+        {
+            bool justLanded = player.onGround && !kirbyWasOnGroundBeforeUpdate;
+
+            if (kirbyWaveDashArmTimer > 0f)
+            {
+                kirbyWaveDashArmTimer -= Engine.DeltaTime;
+
+                if (justLanded)
+                {
+                    if (Input.MoveY.Value > 0 || player.Ducking)
+                        TriggerKirbyWaveDash();
+
+                    kirbyWaveDashArmTimer = 0f; // one shot per armed dash, hit or miss
+                }
+            }
+
+            if (kirbyWaveDashChain > 0)
+            {
+                kirbyWaveDashChainTimer -= Engine.DeltaTime;
+                if (kirbyWaveDashChainTimer <= 0f)
+                    kirbyWaveDashChain = 0;
+            }
+        }
+
+        private void TriggerKirbyWaveDash()
+        {
+            kirbyWaveDashChain = Math.Min(kirbyWaveDashChain + 1, KirbyWaveDashMaxChain);
+            kirbyWaveDashChainTimer = KirbyWaveDashChainResetTime;
+
+            float bonus = Math.Min(kirbyWaveDashChain * KirbyWaveDashSpeedPerChain, KirbyWaveDashMaxBonusSpeed);
+            // Stacks on top of whatever horizontal speed landing already left
+            // Kirby with, in the dash's own direction -- this is what lets
+            // repeated diagonal-down wave dashes build up more speed than a
+            // single one could, rather than merely preserving it. Only trusts
+            // player.Speed.X's own sign when it already agrees with the dash
+            // (the normal case -- vanilla keeps re-asserting Speed = DashDir *
+            // dashSpeed for the whole dash); otherwise falls back to the dash's
+            // own direction rather than amplifying an unrelated collision bounce.
+            float baseSpeed = Math.Sign(player.Speed.X) == kirbyWaveDashDashDirX
+                ? Math.Abs(player.Speed.X)
+                : 0f;
+            player.Speed.X = kirbyWaveDashDashDirX * (baseSpeed + bonus);
+
+            level?.Particles.Emit(global::Celeste.Player.P_DashA, 4, player.BottomCenter, Vector2.UnitX * 3f, Calc.Down);
+            Input.Rumble(RumbleStrength.Light, RumbleLength.Short);
         }
 
         #endregion
@@ -552,9 +656,13 @@ namespace Celeste.Entities
             // crash a live foreach over the same collection mid-enumeration.
             foreach (Entity entity in player.Scene.Entities.ToArray())
             {
-                // only pull things that can actually be fought -- never Theo,
-                // holdables, or other neutral actors
-                if (entity is not Actor || !IsDamageableTarget(entity))
+                // Pull things that can actually be fought (TakeDamage-able
+                // enemies) plus anything explicitly marked inhaleable via
+                // InhaleableComponent (e.g. K_StarBlock) -- never Theo,
+                // holdables, or other neutral actors that are neither.
+                InhaleableComponent inhaleable = entity.Get<InhaleableComponent>();
+                bool isEnemyTarget = entity is Actor && IsDamageableTarget(entity);
+                if (!isEnemyTarget && inhaleable == null)
                     continue;
 
                 // bosses are too big to inhale
@@ -585,10 +693,16 @@ namespace Celeste.Entities
                 if (dist < 16f)
                 {
                     kirbyHasInhaledEnemy = true;
-                    entity.RemoveSelf();
+                    // InhaleableComponent-marked entities (e.g. K_StarBlock) get
+                    // to decide their own swallow behavior; plain enemies just
+                    // vanish like before.
+                    if (inhaleable != null)
+                        inhaleable.OnInhaled(player);
+                    else
+                        entity.RemoveSelf();
                     // DZ's dedicated inhale-swallow SFX when available; vanilla's
                     // grab sound is the closest fallback otherwise.
-                    PlayKirbySfx("event:/DZ/char/kirby/inhale", "event:/char/madeline/grab");
+                    PlayKirbySfx("event:/Celestellaris/char/kirby/inhale");
                     player.Sprite.Scale = new Vector2(1.4f, .6f);
                     break;
                 }
@@ -736,7 +850,7 @@ namespace Celeste.Entities
             SlashFx.Burst(player.Center, kirbyStarSpitDir.Angle());
             // DZ's dedicated starspit SFX when available; vanilla's dash sound
             // is the closest fallback otherwise.
-            PlayKirbySfx("event:/DZ/char/kirby/starspit", "event:/char/madeline/dash_red_right");
+            PlayKirbySfx("event:/Celestellaris/char/kirby/starspit");
 
             yield return .15f;
 
@@ -822,7 +936,7 @@ namespace Celeste.Entities
         /// animation id vanilla's own UpdateSprite (running unmodified via
         /// orig(self)) picked for the real Sprite this frame -- idle/run/climb/
         /// dash/duck/etc all "just work" this way since kirby_player_ext's ids in
-        /// Graphics/k_sprites.xml deliberately match vanilla's "player" entry.
+        /// Graphics/Pusheen2026/KHM/k_sprites.xml deliberately match vanilla's "player" entry.
         /// </summary>
         internal void RenderKirbyOverlay()
         {

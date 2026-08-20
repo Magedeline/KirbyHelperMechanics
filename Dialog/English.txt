@@ -1,0 +1,35 @@
+# Kirby Helper Mechanics ============================================
+
+# Mod Options ---------------------------------------------------------
+# modoptions_kirbyhelpermechanics_title is Everest's auto-picked header
+# for this mod's Mod Options page (Name: KirbyHelperMechanics in
+# everest.yaml -> modoptions_<name lowercase>_title by convention).
+modoptions_kirbyhelpermechanics_title= KIRBY HELPER MECHANICS
+
+# These three are unbound by default (see KirbyHelperMechanicsModuleSettings.cs)
+# and only show up under Mod Options -> Keyboard/Controller Config once a
+# player opts in, so their labels need to read fine standalone.
+modoptions_kirbyhelpermechanics_inhalebutton= Kirby Inhale
+modoptions_kirbyhelpermechanics_spitpuffbutton= Kirby Spit Puff
+modoptions_kirbyhelpermechanics_toggleplayerbutton= Toggle Kirby / Madeline
+
+# Maps ------------------------------------------------------------------
+# Everest derives a map's chapter-select title automatically from its
+# Maps-relative file path with "/" -> "_" -- no explicit "Dialog:" field
+# in the .meta.yaml (confirmed against no .meta.yaml in this install
+# using one, and against CEL's own Maps/CEL/Area/00_Prologue.bin, whose
+# working title key is literally CEL_Area_00_Prologue). This map lives at
+# Maps/Pusheen2026/KHM/PLAYTEST.bin, so its real auto-lookup key is
+# Pusheen2026_KHM_PLAYTEST, not KHM_Pusheen2026_KHM_PLAYTEST -- both are
+# provided below since the second was asked for by name explicitly.
+Pusheen2026_KHM_PLAYTEST=Kirby Helper Mechanics -- Playtest
+KHM_Pusheen2026_KHM_PLAYTEST=Kirby Helper Mechanics -- Playtest
+
+# Cutscenes / Dialogue --------------------------------------------------
+KHM_MADDY_PLAYTESTEND=
+{anchor top}
+[MADELINE right normal]
+Thank you for playtesting my modded game!
+This is just a scratch of the surface --
+for now, you can play as Kirby, with plenty of new entities to try out.
+See ya later!

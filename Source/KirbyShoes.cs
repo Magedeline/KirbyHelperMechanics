@@ -6,7 +6,7 @@ namespace Celeste.Entities
 {
     /// <summary>
     /// Renders a pair of Kirby-style shoes at the player's feet via the
-    /// "kirby_shoes" sprite bank entry (Graphics/k_sprites.xml), replacing
+    /// "kirby_shoes" sprite bank entry (Graphics/Pusheen2026/KHM/k_sprites.xml), replacing
     /// the hat+scarf accent DZ uses. Tinted per Player.Dashes via
     /// KirbyDashColors, mirroring vanilla hair's own "stay the flash color
     /// during a flash effect, otherwise use the dash-tier color" convention.
@@ -30,7 +30,7 @@ namespace Celeste.Entities
         public KirbyShoes(global::Celeste.Player player) : base(active: true, visible: false)
         {
             this.player = player;
-            // "kirby_shoes" lives only in Graphics/k_sprites.xml, read from our own
+            // "kirby_shoes" lives only in Graphics/Pusheen2026/KHM/k_sprites.xml, read from our own
             // dedicated KirbySpriteBank (see its doc comment in
             // KirbyHelperMechanicsModule) rather than GFX.SpriteBank. Guard instead
             // of crashing the whole room load if this component somehow gets built

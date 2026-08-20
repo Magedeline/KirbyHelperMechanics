@@ -6,10 +6,10 @@
 #   pwsh ./publish.ps1 -Configuration Debug
 #
 # The zip contains exactly what Everest needs at Mods/KirbyHelperMechanics/:
-# everest.yaml, bin/, Graphics/, Loenn/, Audio/, README.md -- with everest.yaml
-# sitting at the ZIP ROOT (not inside a wrapping folder), since Everest expects
-# to find it there. Dev-only content (Source/, lib-stripped/, .git/, .vs/,
-# build intermediates) is deliberately left out.
+# everest.yaml, bin/, Graphics/, Loenn/, Audio/, Dialog/, Maps/, README.md --
+# with everest.yaml sitting at the ZIP ROOT (not inside a wrapping folder),
+# since Everest expects to find it there. Dev-only content (Source/,
+# lib-stripped/, .git/, .vs/, build intermediates) is deliberately left out.
 
 param(
     [string]$Configuration = "Release"
@@ -37,7 +37,7 @@ if (Test-Path $distDir) {
 }
 New-Item -ItemType Directory -Path $stageDir | Out-Null
 
-$includePaths = @("everest.yaml", "bin", "Graphics", "Loenn", "Audio", "README.md")
+$includePaths = @("everest.yaml", "bin", "Graphics", "Loenn", "Audio", "Dialog", "Maps", "README.md")
 foreach ($item in $includePaths) {
     $src = Join-Path $root $item
     if (-not (Test-Path $src)) {

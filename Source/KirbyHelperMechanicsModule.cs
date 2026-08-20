@@ -8,7 +8,7 @@ namespace Celeste.Mod.KirbyHelperMechanics
     /// <summary>
     /// Entry point for the Kirby Helper Mechanics mod.
     /// <para>
-    /// Graphics/k_sprites.xml is a custom-named sprite bank -- Everest only
+    /// Graphics/Pusheen2026/KHM/k_sprites.xml is a custom-named sprite bank -- Everest only
     /// auto-merges files literally named Graphics/Sprites.xml across mods, so
     /// this file must be loaded explicitly. This is deliberate, not just an
     /// Everest quirk: DZ's own Mods/DZ/Graphics/Sprites.xml already defines a
@@ -52,7 +52,7 @@ namespace Celeste.Mod.KirbyHelperMechanics
         public static bool DZLoaded { get; private set; }
 
         /// <summary>
-        /// Dedicated sprite bank built from Graphics/k_sprites.xml, holding
+        /// Dedicated sprite bank built from Graphics/Pusheen2026/KHM/k_sprites.xml, holding
         /// kirby_player_ext/kirby_shoes/etc. Kept as our own instance rather
         /// than merged into the shared GFX.SpriteBank, because GFX.SpriteBank
         /// is still null when LoadContent runs (Everest calls mod LoadContent
@@ -107,7 +107,7 @@ namespace Celeste.Mod.KirbyHelperMechanics
             // GFX.SpriteBank (which is still null at this point -- see the field
             // doc comment), is what actually makes kirby_player_ext/kirby_shoes/
             // etc available.
-            KirbySpriteBank = new Monocle.SpriteBank(GFX.Game, "Graphics/k_sprites.xml");
+            KirbySpriteBank = new Monocle.SpriteBank(GFX.Game, "Graphics/Pusheen2026/KHM/k_sprites.xml");
             // KirbyPlayerController rides the real vanilla Player, so it reads
             // global::Celeste.Player's own P_DashA/P_DashB/etc particle-type
             // statics directly -- no separate copy step needed here anymore.

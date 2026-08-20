@@ -19,6 +19,16 @@ namespace Celeste.Mod.KirbyHelperMechanics
         public bool PlayerAutoSelect { get; set; } = false;
 
         /// <summary>
+        /// Fallback for K_PlayerTrigger's own per-trigger "revertOnLeave" field
+        /// when that field is left on "Default" (new placements) or absent
+        /// entirely (maps saved before the field existed). Lets a mapper/player
+        /// pick a global default -- e.g. always revert back to Madeline on
+        /// leaving a Kirby-targeted trigger -- without having to set
+        /// revertOnLeave on every single trigger placement.
+        /// </summary>
+        public bool DefaultRevertPlayerOnTriggerLeave { get; set; } = false;
+
+        /// <summary>
         /// Overrides KirbyPlayerEnabled's auto-generated OnOff menu item (Everest
         /// looks for a Create{PropertyName}Entry(TextMenu, bool) method on this
         /// class before falling back to its own reflection-based item -- see

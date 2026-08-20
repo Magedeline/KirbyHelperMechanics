@@ -17,8 +17,8 @@ namespace Celeste.Entities
     [Tracked]
     public class K_PlayerRefill : Entity
     {
-        private const string SfxTouch = "event:/game/general/diamond_touch";
-        private const string SfxReturn = "event:/game/general/diamond_return";
+        private const string SfxTouch = "event:/Celestellaris/game/general/diamond_touch";
+        private const string SfxReturn = "event:/Celestellaris/game/general/diamond_return";
 
         private readonly bool oneUse;
         private readonly bool refillDash;

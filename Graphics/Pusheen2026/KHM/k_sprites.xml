@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <!--
-    Graphics/k_sprites.xml is a custom-named sprite bank, loaded explicitly
-    by KirbyHelperMechanicsModule.LoadContent via SpriteBank.LoadSpriteBank;
-    it must NOT be named Graphics/Sprites.xml. DZ's own
+    Graphics/Pusheen2026/KHM/k_sprites.xml is a custom-named sprite bank,
+    loaded explicitly by KirbyHelperMechanicsModule.LoadContent via a direct
+    Monocle.SpriteBank(GFX.Game, path) construction; it must NOT be named
+    Graphics/Sprites.xml. DZ's own
     Mods/DZ/Graphics/Sprites.xml already defines an element also named
     "kirby_player_ext" (with a different, "kirby_"-prefixed animation
     scheme: start="kirby_idle", ids like kirby_idle/kirby_walk/kirby_run

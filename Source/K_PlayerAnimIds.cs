@@ -2,9 +2,9 @@ namespace Celeste.Mod.KirbyHelperMechanics
 {
     /// <summary>
     /// Animation id constants for the "kirby_player_ext" sprite bank entry
-    /// (Graphics/k_sprites.xml), mirroring vanilla Celeste's PlayerSprite
+    /// (Graphics/Pusheen2026/KHM/k_sprites.xml), mirroring vanilla Celeste's PlayerSprite
     /// pattern of exposing animation ids as fields instead of magic strings.
-    /// Keep in sync with Graphics/k_sprites.xml -- every id here must exist
+    /// Keep in sync with Graphics/Pusheen2026/KHM/k_sprites.xml -- every id here must exist
     /// as an Anim/Loop id under kirby_player_ext, and vice versa.
     /// </summary>
     public static class K_PlayerAnimIds
@@ -88,7 +88,7 @@ namespace Celeste.Mod.KirbyHelperMechanics
         public const string Copy = "kirby_copy";
 
         // Staged for a future roll-attack/landing-impact ability -- ids exist
-        // in Graphics/k_sprites.xml but no KirbyPlayerController state calls
+        // in Graphics/Pusheen2026/KHM/k_sprites.xml but no KirbyPlayerController state calls
         // them yet.
         public const string Roll = "kirby_roll";
         public const string RollGetup = "kirby_rollGetup";
