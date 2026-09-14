@@ -23,32 +23,17 @@ lockedDoor.placements = {
 local fillColor = {0.23, 0.18, 0.13, 0.95}
 local lockColor = {1.0, 0.91, 0.40, 1.0}
 
-local function push(sprites, rectangle)
-    local result = rectangle:getDrawableSprite()
-
-    if result[1] ~= nil then
-        for _, sprite in ipairs(result) do
-            table.insert(sprites, sprite)
-        end
-    else
-        table.insert(sprites, result)
-    end
-end
-
-local function pushRect(sprites, x, y, width, height, fill, line)
-    push(sprites, drawableRectangle.fromRectangle("fill", x, y, width, height, fill))
-    push(sprites, drawableRectangle.fromRectangle("line", x, y, width, height, line))
-end
-
 function lockedDoor.sprite(room, entity)
     local x, y = entity.x or 0, entity.y or 0
     local width, height = entity.width or 16, entity.height or 32
-    local sprites = {}
+    local cx, cy = x + width / 2 - 2, y + height / 2 - 2
 
-    pushRect(sprites, x, y, width, height, fillColor, {0.05, 0.05, 0.05, 1.0})
-    pushRect(sprites, x + width / 2 - 2, y + height / 2 - 2, 4, 4, lockColor, lockColor)
-
-    return sprites
+    return {
+        drawableRectangle.fromRectangle("fill", x, y, width, height, fillColor),
+        drawableRectangle.fromRectangle("line", x, y, width, height, {0.05, 0.05, 0.05, 1.0}),
+        drawableRectangle.fromRectangle("fill", cx, cy, 4, 4, lockColor),
+        drawableRectangle.fromRectangle("line", cx, cy, 4, 4, lockColor),
+    }
 end
 
 function lockedDoor.selection(room, entity)

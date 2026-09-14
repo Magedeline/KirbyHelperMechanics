@@ -29,30 +29,13 @@ badelineBoss.fieldInformation = {
 local fillColor = {0.17, 0.10, 0.24, 1.0}
 local lineColor = {0.42, 0.88, 1.0, 1.0}
 
-local function push(sprites, rectangle)
-    local result = rectangle:getDrawableSprite()
-
-    if result[1] ~= nil then
-        for _, sprite in ipairs(result) do
-            table.insert(sprites, sprite)
-        end
-    else
-        table.insert(sprites, result)
-    end
-end
-
-local function pushRect(sprites, x, y, width, height, fill, line)
-    push(sprites, drawableRectangle.fromRectangle("fill", x, y, width, height, fill))
-    push(sprites, drawableRectangle.fromRectangle("line", x, y, width, height, line))
-end
-
 function badelineBoss.sprite(room, entity)
     local x, y = (entity.x or 0) - 8, (entity.y or 0) - 20
-    local sprites = {}
 
-    pushRect(sprites, x, y, 16, 20, fillColor, lineColor)
-
-    return sprites
+    return {
+        drawableRectangle.fromRectangle("fill", x, y, 16, 20, fillColor),
+        drawableRectangle.fromRectangle("line", x, y, 16, 20, lineColor),
+    }
 end
 
 function badelineBoss.selection(room, entity)

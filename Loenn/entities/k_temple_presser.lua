@@ -19,25 +19,12 @@ templePresser.placements = {
 
 local fillColor = {0.42, 0.42, 0.42, 1.0}
 
-local function push(sprites, rectangle)
-    local result = rectangle:getDrawableSprite()
-
-    if result[1] ~= nil then
-        for _, sprite in ipairs(result) do
-            table.insert(sprites, sprite)
-        end
-    else
-        table.insert(sprites, result)
-    end
-end
-
 function templePresser.sprite(room, entity)
     local x, y = (entity.x or 0) - 8, (entity.y or 0) - 4
-    local sprites = {}
 
-    push(sprites, drawableRectangle.fromRectangle("fill", x, y, 16, 4, fillColor))
-
-    return sprites
+    return {
+        drawableRectangle.fromRectangle("fill", x, y, 16, 4, fillColor),
+    }
 end
 
 function templePresser.selection(room, entity)

@@ -54,6 +54,26 @@ namespace Celeste.Entities
             if (cooldownTimer > 0f)
                 return;
 
+            // Force out of Kirby's own ability states (Float above all --
+            // KirbyFloatUpdate drives Speed.Y toward its own gentle terminal
+            // fall speed every frame) before applying the bounce. Left
+            // active, Float keeps fighting/stacking with the impulse below
+            // frame after frame -- what reads as the bounce "forcing Kirby
+            // upward" far harder than a normal spring, or oscillating
+            // instead of a single clean launch. A plain StNormal state
+            // doesn't touch Speed.Y on its own, so this makes the spring
+            // behave the same for Kirby as it already does for Madeline.
+            if (player.Get<KirbyPlayerController>()?.InKirbyAbilityState is true)
+                player.StateMachine.State = global::Celeste.Player.StNormal;
+
+            // Clear onGround before the impulse -- without this, a spring
+            // sitting flush on a floor tile lets vanilla's own landed
+            // handling see the player as still grounded for a frame after
+            // the bounce and immediately re-clamp/re-settle them, which is
+            // what makes the bounce look like it "goes down instantly" with
+            // no cooldown even though cooldownTimer is armed correctly below.
+            player.onGround = false;
+
             switch (orientation)
             {
                 case Orientation.Up:
@@ -68,6 +88,15 @@ namespace Celeste.Entities
             }
 
             player.varJumpTimer = 0f;
+
+            // Match vanilla Spring's own SuperBounce/SideBounce contract: arm
+            // AutoJump so a jump press right after this bounce becomes a
+            // normal bounce-jump combo instead of nothing (plain Madeline) or
+            // getting stolen into a Float hover (Kirby -- see
+            // KirbyPlayerController.KirbyJustBounced).
+            player.AutoJump = true;
+            player.AutoJumpTimer = 0f;
+
             cooldownTimer = Cooldown;
             Audio.Play("event:/Celestellaris/game/general/spring", Position);
             Input.Rumble(RumbleStrength.Medium, RumbleLength.Short);

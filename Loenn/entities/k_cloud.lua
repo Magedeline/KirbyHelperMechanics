@@ -22,28 +22,15 @@ cloud.placements = {
     },
 }
 
-local function push(sprites, rectangle)
-    local result = rectangle:getDrawableSprite()
-
-    if result[1] ~= nil then
-        for _, sprite in ipairs(result) do
-            table.insert(sprites, sprite)
-        end
-    else
-        table.insert(sprites, result)
-    end
-end
-
 function cloud.sprite(room, entity)
     local x, y = entity.x or 0, entity.y or 0
     local width = entity.width or 32
     local fillColor = entity.fragile and {1.0, 0.70, 0.90, 1.0} or {0.91, 0.91, 1.0, 1.0}
-    local sprites = {}
 
-    push(sprites, drawableRectangle.fromRectangle("fill", x, y, width, 6, fillColor))
-    push(sprites, drawableRectangle.fromRectangle("line", x, y, width, 6, {0.0, 0.0, 0.0, 0.4}))
-
-    return sprites
+    return {
+        drawableRectangle.fromRectangle("fill", x, y, width, 6, fillColor),
+        drawableRectangle.fromRectangle("line", x, y, width, 6, {0.0, 0.0, 0.0, 0.4}),
+    }
 end
 
 function cloud.selection(room, entity)

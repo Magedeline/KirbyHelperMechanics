@@ -209,6 +209,30 @@ namespace Celeste.Entities
         private bool jumpPressedFresh;
         private bool kirbyWasOnGroundBeforeUpdate;
 
+        // Generic "just got bounced" detector -- covers vanilla Springs, ice
+        // springs, Oshiro's chaser bounce, Seekers, and any other bounce pad
+        // (including this mod's own K_Spring, which sets Speed.Y directly
+        // rather than going through vanilla's Bounce/SuperBounce/SideBounce)
+        // without needing to special-case every entity type. PreUpdate runs
+        // before orig(self) touches physics/state for this frame, so comparing
+        // Speed.Y here against the value snapshotted at the END of last frame
+        // (PostUpdate) isolates exactly what some other entity's OnCollide did
+        // to Speed.Y between frames -- gravity, dashes, and Kirby's own
+        // jump/float logic all run inside orig(self), strictly after this
+        // comparison, so they never trigger it.
+        private const float KirbyBounceDetectThreshold = 45f;
+        private const float KirbyBounceGraceTime = 0.12f;
+        private float kirbyPrevFrameSpeedY;
+        private float kirbyBounceGraceTimer;
+
+        /// <summary>
+        /// True while it's unsafe to steal the current jump press into a Float
+        /// hover or double jump -- either vanilla's own AutoJump wants it (see
+        /// CheckFloatEntry), or Kirby was just bounced by some spring/enemy/pad
+        /// this frame or last (see kirbyBounceGraceTimer above).
+        /// </summary>
+        private bool KirbyJustBounced => player.AutoJump || kirbyBounceGraceTimer > 0f;
+
         /// <summary>Public accessor, e.g. for a future HUD or refill entity.</summary>
         public int KirbyFlapCount => kirbyFlapCount;
 
@@ -219,6 +243,18 @@ namespace Celeste.Entities
         {
             jumpPressedFresh = Input.Jump.Check && !prevJumpCheck;
             kirbyWasOnGroundBeforeUpdate = player.onGround;
+
+            if (kirbyBounceGraceTimer > 0f)
+                kirbyBounceGraceTimer -= Engine.DeltaTime;
+
+            // A sudden large upward jump in Speed.Y since last frame, with
+            // nothing of Kirby's own jump/float logic in between to cause it
+            // (that all runs later, inside orig(self)), means some other
+            // entity's OnCollide -- Spring, ice spring, Oshiro's chaser
+            // bounce, Seeker, this mod's own K_Spring, etc. -- bounced Kirby
+            // just now.
+            if (!player.onGround && kirbyPrevFrameSpeedY - player.Speed.Y > KirbyBounceDetectThreshold)
+                kirbyBounceGraceTimer = KirbyBounceGraceTime;
 
             // Flaps and the double jump fully refill while grounded, mirroring
             // the legacy K_Player's per-frame "onGround -> reset to max" behavior.
@@ -233,6 +269,7 @@ namespace Celeste.Entities
         internal void PostUpdate()
         {
             prevJumpCheck = Input.Jump.Check;
+            kirbyPrevFrameSpeedY = player.Speed.Y;
             UpdateKirbyWaveDash();
         }
 
@@ -258,6 +295,13 @@ namespace Celeste.Entities
                 return false;
             if (kirbyFlapCount <= 0)
                 return false;
+            // Just bounced off a spring/enemy/pad -- see KirbyJustBounced.
+            // Stealing this jump press into a Float hover fights the bounce
+            // combo: the player presses jump to ride the bounce higher and
+            // instead gets puffed up mid-air. Let vanilla's own bounce-jump
+            // handling (or a plain jump) win instead.
+            if (KirbyJustBounced)
+                return false;
 
             Input.Jump.ConsumeBuffer();
             return true;
@@ -282,6 +326,9 @@ namespace Celeste.Entities
             if (player.WallJumpCheck(1) || player.WallJumpCheck(-1))
                 return false;
             if (kirbyDoubleJumpUsed)
+                return false;
+            // See CheckFloatEntry: don't steal a post-bounce jump press.
+            if (KirbyJustBounced)
                 return false;
 
             kirbyDoubleJumpUsed = true;
@@ -923,7 +970,7 @@ namespace Celeste.Entities
         /// Sprite.CurrentAnimationID, since none of those ids exist in vanilla's
         /// own "player"/"badeline" bank.
         /// </summary>
-        private bool InKirbyAbilityState =>
+        public bool InKirbyAbilityState =>
             (StKirbyFloat >= 0 && player.StateMachine.State == StKirbyFloat) ||
             (StKirbyInhale >= 0 && player.StateMachine.State == StKirbyInhale) ||
             (StKirbyStarSpit >= 0 && player.StateMachine.State == StKirbyStarSpit);

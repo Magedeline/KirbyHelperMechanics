@@ -26,31 +26,14 @@ switchGate.placements = {
 local fillColor = {0.56, 0.56, 0.56, 0.7}
 local lineColor = {0.15, 0.15, 0.15, 1.0}
 
-local function push(sprites, rectangle)
-    local result = rectangle:getDrawableSprite()
-
-    if result[1] ~= nil then
-        for _, sprite in ipairs(result) do
-            table.insert(sprites, sprite)
-        end
-    else
-        table.insert(sprites, result)
-    end
-end
-
-local function pushRect(sprites, x, y, width, height, fill, line)
-    push(sprites, drawableRectangle.fromRectangle("fill", x, y, width, height, fill))
-    push(sprites, drawableRectangle.fromRectangle("line", x, y, width, height, line))
-end
-
 function switchGate.sprite(room, entity)
     local x, y = entity.x or 0, entity.y or 0
     local width, height = entity.width or 16, entity.height or 16
-    local sprites = {}
 
-    pushRect(sprites, x, y, width, height, fillColor, lineColor)
-
-    return sprites
+    return {
+        drawableRectangle.fromRectangle("fill", x, y, width, height, fillColor),
+        drawableRectangle.fromRectangle("line", x, y, width, height, lineColor),
+    }
 end
 
 function switchGate.selection(room, entity)

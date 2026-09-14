@@ -22,31 +22,14 @@ dreamBlock.placements = {
 local fillColor = {0.035, 0.10, 0.24, 0.85}
 local lineColor = {0.42, 0.88, 1.0, 0.9}
 
-local function push(sprites, rectangle)
-    local result = rectangle:getDrawableSprite()
-
-    if result[1] ~= nil then
-        for _, sprite in ipairs(result) do
-            table.insert(sprites, sprite)
-        end
-    else
-        table.insert(sprites, result)
-    end
-end
-
-local function pushRect(sprites, x, y, width, height, fill, line)
-    push(sprites, drawableRectangle.fromRectangle("fill", x, y, width, height, fill))
-    push(sprites, drawableRectangle.fromRectangle("line", x, y, width, height, line))
-end
-
 function dreamBlock.sprite(room, entity)
     local x, y = entity.x or 0, entity.y or 0
     local width, height = entity.width or 16, entity.height or 16
-    local sprites = {}
 
-    pushRect(sprites, x, y, width, height, fillColor, lineColor)
-
-    return sprites
+    return {
+        drawableRectangle.fromRectangle("fill", x, y, width, height, fillColor),
+        drawableRectangle.fromRectangle("line", x, y, width, height, lineColor),
+    }
 end
 
 function dreamBlock.selection(room, entity)

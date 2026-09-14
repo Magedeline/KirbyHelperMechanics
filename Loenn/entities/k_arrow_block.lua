@@ -39,33 +39,19 @@ local directionOffsets = {
     Down = {0, 1},
 }
 
-local function push(sprites, rectangle)
-    local result = rectangle:getDrawableSprite()
-
-    if result[1] ~= nil then
-        for _, sprite in ipairs(result) do
-            table.insert(sprites, sprite)
-        end
-    else
-        table.insert(sprites, result)
-    end
-end
-
 function arrowBlock.sprite(room, entity)
     local x, y = entity.x or 0, entity.y or 0
     local width, height = entity.width or 16, entity.height or 16
-    local sprites = {}
-
-    push(sprites, drawableRectangle.fromRectangle("fill", x, y, width, height, fillColor))
-    push(sprites, drawableRectangle.fromRectangle("line", x, y, width, height, lineColor))
 
     local dir = directionOffsets[entity.direction or "Right"] or directionOffsets.Right
     local cx, cy = x + width / 2, y + height / 2
     local len = math.min(width, height) / 2 - 2
 
-    push(sprites, drawableLine.fromPoints({cx, cy, cx + dir[1] * len, cy + dir[2] * len}, arrowColor, 2))
-
-    return sprites
+    return {
+        drawableRectangle.fromRectangle("fill", x, y, width, height, fillColor),
+        drawableRectangle.fromRectangle("line", x, y, width, height, lineColor),
+        drawableLine.fromPoints({cx, cy, cx + dir[1] * len, cy + dir[2] * len}, arrowColor, 2),
+    }
 end
 
 function arrowBlock.selection(room, entity)
