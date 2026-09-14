@@ -24,11 +24,13 @@ namespace Celeste.Entities
         private const float TurnRate = 4f; // fraction of HomingSpeed approached per second
         private const float DetectRange = 140f;
         private const int TouchDamage = 1;
+        private const float HitCooldown = 0.5f;
 
         private readonly int maxHealth;
         private int health;
         private Vector2 velocity;
         private float hurtFlash;
+        private float cooldownTimer;
         private bool aggro;
 
         public K_SeekerChaser(EntityData data, Vector2 offset)
@@ -49,6 +51,8 @@ namespace Celeste.Entities
 
             if (hurtFlash > 0f)
                 hurtFlash -= Engine.DeltaTime;
+            if (cooldownTimer > 0f)
+                cooldownTimer -= Engine.DeltaTime;
 
             global::Celeste.Player player = Scene?.Tracker.GetEntity<global::Celeste.Player>();
             bool inRange = player != null && Vector2.Distance(player.Center, Center) < DetectRange;
@@ -73,12 +77,20 @@ namespace Celeste.Entities
 
         private void OnPlayer(global::Celeste.Player player)
         {
-            Audio.Play("event:/Celestellaris/game/07_inferno/seeker_booped", Position);
-
             if (player.Get<KirbyPlayerController>() != null)
+            {
+                if (cooldownTimer > 0f)
+                    return;
+                cooldownTimer = HitCooldown;
+
+                Audio.Play("event:/Celestellaris/game/07_inferno/seeker_booped", Position);
                 K_PlayerHealthManager.TryDamagePlayer(TouchDamage, Center);
+            }
             else
+            {
+                Audio.Play("event:/Celestellaris/game/07_inferno/seeker_booped", Position);
                 player.Die((player.Center - Center).SafeNormalize());
+            }
         }
 
         public void TakeDamage(int amount)

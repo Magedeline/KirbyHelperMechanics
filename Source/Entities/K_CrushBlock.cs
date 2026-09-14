@@ -27,10 +27,12 @@ namespace Celeste.Entities
         private const float RetreatDelay = 0.6f;
         private const float RetreatDuration = 0.8f;
         private const int TouchDamage = 1;
+        private const float HitCooldown = 0.5f;
 
         private readonly ChargeAxis axis;
         private readonly Vector2 start;
         private bool busy;
+        private float cooldownTimer;
 
         public K_CrushBlock(EntityData data, Vector2 offset)
             : base(data.Position + offset, data.Width, data.Height, safe: false)
@@ -45,6 +47,9 @@ namespace Celeste.Entities
         public override void Update()
         {
             base.Update();
+
+            if (cooldownTimer > 0f)
+                cooldownTimer -= Engine.DeltaTime;
 
             if (busy || Scene == null)
                 return;
@@ -98,9 +103,16 @@ namespace Celeste.Entities
                 return;
 
             if (player.Get<KirbyPlayerController>() != null)
+            {
+                if (cooldownTimer > 0f)
+                    return;
+                cooldownTimer = HitCooldown;
                 K_PlayerHealthManager.TryDamagePlayer(TouchDamage, Center);
+            }
             else
+            {
                 player.Die((player.Center - Center).SafeNormalize());
+            }
         }
 
         private IEnumerator ReturnRoutine()

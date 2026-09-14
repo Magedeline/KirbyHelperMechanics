@@ -15,9 +15,11 @@ namespace Celeste.Entities
     {
         private const float Speed = 90f;
         private const int TouchDamage = 1;
+        private const float HitCooldown = 0.5f;
 
         private readonly Color bodyColor;
         private Vector2 velocity;
+        private float cooldownTimer;
 
         public K_BouncingHazard(EntityData data, Vector2 offset) : base(data.Position + offset)
         {
@@ -41,14 +43,24 @@ namespace Celeste.Entities
                 velocity.X *= -1f;
             if (MoveV(velocity.Y * Engine.DeltaTime))
                 velocity.Y *= -1f;
+
+            if (cooldownTimer > 0f)
+                cooldownTimer -= Engine.DeltaTime;
         }
 
         private void OnPlayer(global::Celeste.Player player)
         {
             if (player.Get<KirbyPlayerController>() != null)
+            {
+                if (cooldownTimer > 0f)
+                    return;
+                cooldownTimer = HitCooldown;
                 K_PlayerHealthManager.TryDamagePlayer(TouchDamage, Center);
+            }
             else
+            {
                 player.Die((player.Center - Center).SafeNormalize());
+            }
         }
 
         public override void Render()
