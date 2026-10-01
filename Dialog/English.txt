@@ -10,6 +10,7 @@ modoptions_kirbyhelpermechanics_title= KIRBY HELPER MECHANICS
 # and only show up under Mod Options -> Keyboard/Controller Config once a
 # player opts in, so their labels need to read fine standalone.
 modoptions_kirbyhelpermechanics_inhalebutton= Kirby Inhale
+modoptions_kirbyhelpermechanics_floatbutton= Kirby Float
 modoptions_kirbyhelpermechanics_spitpuffbutton= Kirby Spit Puff
 modoptions_kirbyhelpermechanics_toggleplayerbutton= Toggle Kirby / Madeline
 

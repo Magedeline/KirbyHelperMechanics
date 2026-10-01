@@ -16,7 +16,7 @@ public class PlayerSelectionManager : Entity
     /// <summary>Available player types in the system.</summary>
     public enum PlayerType
     {
-        /// <summary>Kirby - Kirby character with special abilities (double-jump, alternate dash, combat, hover)</summary>
+        /// <summary>Kirby - Kirby character with special abilities (flap/hover, alternate dash, combat, inhale)</summary>
         Kirby = 0,
         
         /// <summary>Madeline - Standard Celeste player without special abilities</summary>

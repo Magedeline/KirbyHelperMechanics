@@ -48,6 +48,11 @@ namespace Celeste.Entities
             cooldownTimer = Cooldown;
             wobble = 1f;
 
+            // Same as K_Spring: drop out of Kirby's ability states first so
+            // Float doesn't keep riding the launch impulse.
+            if (player.Get<KirbyPlayerController>()?.InKirbyAbilityState is true)
+                player.StateMachine.State = global::Celeste.Player.StNormal;
+
             Vector2 dir = (player.Center - Center).SafeNormalize(-Vector2.UnitY);
             player.Speed = dir * LaunchSpeed;
             player.varJumpTimer = 0f;

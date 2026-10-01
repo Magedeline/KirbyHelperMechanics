@@ -46,7 +46,9 @@ namespace Celeste.Entities
             // Marker component only -- KirbyPlayerController.PullAndInhaleEnemies
             // checks for its presence to pull/inhale entities that aren't
             // TakeDamage-able "enemies", this block included.
-            Add(new InhaleableComponent());
+            // The spat star scales with the block: 8px -> small, 16px -> medium,
+            // 32px -> large.
+            Add(new InhaleableComponent { StarSize = px switch { 16 => 1, 32 => 2, _ => 0 } });
         }
 
         private static int SizePixels(string size) => size?.ToLowerInvariant() switch

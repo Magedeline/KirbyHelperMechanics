@@ -167,10 +167,6 @@ namespace Celeste.Entities
         // (re-)entered from grounded.
         private const float KirbyFloatMaxDuration = 1.5f;
 
-        // Double jump's Jump() impulse (vanilla Speed.Y = -105) multiplied by
-        // this to make Kirby's mid-air jump noticeably stronger than a grounded one.
-        private const float KirbyDoubleJumpPower = 1.3f;
-
         // Cap on the progressive flap cost in KirbyFloatBegin (see
         // kirbyFloatEntriesThisAirtime) -- without a cap, a large
         // KirbyMaxFloatJumps setting would make each successive re-entry cost
@@ -188,13 +184,6 @@ namespace Celeste.Entities
         // looped indefinitely to stall in the air for free.
         private int kirbyFloatEntriesThisAirtime;
 
-        // One free mid-air jump (real Jump() impulse, not a Float hover), usable
-        // whenever Kirby is airborne without coyote/wall-jump options. Tracked
-        // separately from kirbyFlapCount -- Float is the flap-metered hover
-        // ability, this is a single discrete "double jump" -- and refills only
-        // on landing, same as flaps.
-        private bool kirbyDoubleJumpUsed;
-
         // Rising-edge jump detection: Kirby's air abilities must only trigger on a
         // FRESH jump press, not a buffered one (a press made just before landing or
         // reaching a wall is reserved for vanilla jumps so jump buffering still
@@ -203,10 +192,10 @@ namespace Celeste.Entities
         // NOT from this Component's own Update(), because Monocle updates
         // Components in add-order and StateMachine (added in Player's constructor,
         // long before this component exists) would otherwise run NormalUpdate
-        // BEFORE this component's Update() recomputed jumpPressedFresh for the
+        // BEFORE this component's Update() recomputed floatPressedFresh for the
         // frame, reading last frame's stale value.
-        private bool prevJumpCheck;
-        private bool jumpPressedFresh;
+        private bool prevFloatCheck;
+        private bool floatPressedFresh;
         private bool kirbyWasOnGroundBeforeUpdate;
 
         // Generic "just got bounced" detector -- covers vanilla Springs, ice
@@ -227,11 +216,12 @@ namespace Celeste.Entities
 
         /// <summary>
         /// True while it's unsafe to steal the current jump press into a Float
-        /// hover or double jump -- either vanilla's own AutoJump wants it (see
-        /// CheckFloatEntry), or Kirby was just bounced by some spring/enemy/pad
-        /// this frame or last (see kirbyBounceGraceTimer above).
+        /// float button or hover -- Kirby was just bounced by some spring/enemy/pad
+        /// this frame or last (see kirbyBounceGraceTimer above). Deliberately
+        /// not keyed off player.AutoJump: springs leave that set until Kirby
+        /// lands, which would lock Float out for the whole airtime.
         /// </summary>
-        private bool KirbyJustBounced => player.AutoJump || kirbyBounceGraceTimer > 0f;
+        private bool KirbyJustBounced => kirbyBounceGraceTimer > 0f;
 
         /// <summary>Public accessor, e.g. for a future HUD or refill entity.</summary>
         public int KirbyFlapCount => kirbyFlapCount;
@@ -241,7 +231,7 @@ namespace Celeste.Entities
 
         internal void PreUpdate()
         {
-            jumpPressedFresh = Input.Jump.Check && !prevJumpCheck;
+            floatPressedFresh = FloatCheck && !prevFloatCheck;
             kirbyWasOnGroundBeforeUpdate = player.onGround;
 
             if (kirbyBounceGraceTimer > 0f)
@@ -256,21 +246,51 @@ namespace Celeste.Entities
             if (!player.onGround && kirbyPrevFrameSpeedY - player.Speed.Y > KirbyBounceDetectThreshold)
                 kirbyBounceGraceTimer = KirbyBounceGraceTime;
 
-            // Flaps and the double jump fully refill while grounded, mirroring
+            // Flaps fully refill while grounded, mirroring
             // the legacy K_Player's per-frame "onGround -> reset to max" behavior.
             if (player.onGround)
             {
                 kirbyFlapCount = KirbyHelperMechanicsModule.Settings?.KirbyMaxFloatJumps ?? 5;
-                kirbyDoubleJumpUsed = false;
                 kirbyFloatEntriesThisAirtime = 0;
             }
         }
 
         internal void PostUpdate()
         {
-            prevJumpCheck = Input.Jump.Check;
+            prevFloatCheck = FloatCheck;
             kirbyPrevFrameSpeedY = player.Speed.Y;
             UpdateKirbyWaveDash();
+        }
+
+        /// <summary>
+        /// Dedicated Float button, falling back to Jump when the option is unbound.
+        /// This lets players move Float to a separate button without changing the
+        /// normal jump, wall-jump, or jump-buffer behavior.
+        /// </summary>
+        private static ButtonBinding FloatButton =>
+            KirbyHelperMechanicsModule.Settings?.KirbyFloatButton;
+
+        // Everest always instantiates a ButtonBinding for the setting, even
+        // with nothing bound, so "unbound" has to be detected from its lists
+        // rather than a null check.
+        private static bool FloatButtonBound
+        {
+            get
+            {
+                ButtonBinding b = FloatButton;
+                return b != null && (b.Keys.Count > 0 || b.Buttons.Count > 0 || b.MouseButtons.Count > 0);
+            }
+        }
+
+        private static bool FloatPressed => FloatButtonBound ? FloatButton.Pressed : Input.Jump.Pressed;
+        private static bool FloatCheck => FloatButtonBound ? FloatButton.Check : Input.Jump.Check;
+
+        private static void ConsumeFloatBuffer()
+        {
+            if (FloatButtonBound)
+                FloatButton.ConsumeBuffer();
+            else
+                Input.Jump.ConsumeBuffer();
         }
 
         /// <summary>
@@ -289,53 +309,19 @@ namespace Celeste.Entities
         {
             if (player.onGround || player.Holding != null)
                 return false;
-            if (!Input.Jump.Pressed || !jumpPressedFresh || player.jumpGraceTimer > 0f)
+            if (!FloatPressed || !floatPressedFresh || player.jumpGraceTimer > 0f)
                 return false;
             if (player.WallJumpCheck(1) || player.WallJumpCheck(-1))
                 return false;
             if (kirbyFlapCount <= 0)
                 return false;
             // Just bounced off a spring/enemy/pad -- see KirbyJustBounced.
-            // Stealing this jump press into a Float hover fights the bounce
-            // combo: the player presses jump to ride the bounce higher and
-            // instead gets puffed up mid-air. Let vanilla's own bounce-jump
-            // handling (or a plain jump) win instead.
+            // Stealing this float-button press fights the bounce combo, so let
+            // vanilla's own bounce-jump handling (or a plain jump) win instead.
             if (KirbyJustBounced)
                 return false;
 
-            Input.Jump.ConsumeBuffer();
-            return true;
-        }
-
-        /// <summary>
-        /// Entry condition for Kirby's one-charge mid-air double jump -- a real
-        /// <see cref="global::Celeste.Player.Jump"/> impulse (not a Float hover),
-        /// usable once per airtime before Float's flap-metered hover takes over.
-        /// Checked from the same two hooks as <see cref="CheckFloatEntry"/> and
-        /// BEFORE it, so the first airborne jump press is a genuine jump and only
-        /// later presses spend flaps entering Float. <see cref="global::Celeste.Player.Jump"/>
-        /// consumes the jump buffer itself, so no separate ConsumeBuffer call is
-        /// needed here.
-        /// </summary>
-        internal bool CheckDoubleJumpEntry()
-        {
-            if (player.onGround || player.Holding != null)
-                return false;
-            if (!Input.Jump.Pressed || !jumpPressedFresh || player.jumpGraceTimer > 0f)
-                return false;
-            if (player.WallJumpCheck(1) || player.WallJumpCheck(-1))
-                return false;
-            if (kirbyDoubleJumpUsed)
-                return false;
-            // See CheckFloatEntry: don't steal a post-bounce jump press.
-            if (KirbyJustBounced)
-                return false;
-
-            kirbyDoubleJumpUsed = true;
-            player.Jump();
-            // Jump() sets Speed.Y to vanilla's fixed -105 -- scale it up so
-            // Kirby's mid-air jump has noticeably more power than a grounded one.
-            player.Speed.Y *= KirbyDoubleJumpPower;
+            ConsumeFloatBuffer();
             return true;
         }
 
@@ -405,7 +391,13 @@ namespace Celeste.Entities
             // Gentle float gravity -- drifts slowly downward (KirbyFloatFallSpeed)
             // rather than a true 0-sink hover, so camping in place still costs
             // altitude over time.
-            player.Speed.Y = Calc.Approach(player.Speed.Y, KirbyFloatFallSpeed, KirbyFloatGravity * Engine.DeltaTime);
+            // Anything rising faster than a flap's own kick (carried in from a
+            // spring/bumper/up-dash/jump) is bled off at vanilla gravity first
+            // -- at KirbyFloatGravity alone it barely decays over the whole
+            // float, launching Kirby several times higher than the bounce
+            // itself would have.
+            float floatGravity = player.Speed.Y < KirbyFloatSpeed ? global::Celeste.Player.Gravity : KirbyFloatGravity;
+            player.Speed.Y = Calc.Approach(player.Speed.Y, KirbyFloatFallSpeed, floatGravity * Engine.DeltaTime);
 
             // Hold-time cap: forces an exit back to normal falling once expired,
             // regardless of remaining flaps or held input -- landing or dashing
@@ -436,11 +428,15 @@ namespace Celeste.Entities
                     player.WallJump(1);
                     return global::Celeste.Player.StNormal;
                 }
+            }
 
-                // Additional flap: press jump again to bounce upward (costs a flap).
+            if (FloatPressed)
+            {
+                // Additional flap: press the Float button again to bounce upward
+                // (costs a flap).
                 if (kirbyFlapCount > 0)
                 {
-                    Input.Jump.ConsumeBuffer();
+                    ConsumeFloatBuffer();
                     kirbyFlapCount = Math.Max(0, kirbyFlapCount - 1);
                     kirbyFlapScaleTimer = KirbyFlapScaleTime;
 
@@ -592,6 +588,9 @@ namespace Celeste.Entities
 
         private float kirbyInhaleTimer;
         private bool kirbyHasInhaledEnemy;
+        // Star Spit's projectile size, taken from whatever was swallowed
+        // (InhaleableComponent.StarSize; plain enemies count as medium).
+        private int kirbyInhaledStarSize = 1;
         private Vector2[] kirbyInhaleTendrils;
 
         /// <summary>
@@ -615,7 +614,9 @@ namespace Celeste.Entities
         {
             if (InhaleButton == null || !InhaleButton.Pressed || player.Holding != null)
                 return false;
-            if (!player.onGround || player.Ducking)
+            // Airborne inhale is allowed -- KirbyInhaleUpdate already applies
+            // its own reduced gravity while off the ground.
+            if (player.Ducking)
                 return false;
             if (Input.MoveY.Value == -1)
                 return false;
@@ -740,6 +741,7 @@ namespace Celeste.Entities
                 if (dist < 16f)
                 {
                     kirbyHasInhaledEnemy = true;
+                    kirbyInhaledStarSize = inhaleable?.StarSize ?? 1;
                     // InhaleableComponent-marked entities (e.g. K_StarBlock) get
                     // to decide their own swallow behavior; plain enemies just
                     // vanish like before.
@@ -820,6 +822,10 @@ namespace Celeste.Entities
             return method;
         }
 
+        private const float KirbyHitStreakWindow = 3f;
+        private int kirbyHitStreak;
+        private float kirbyLastHitTime = float.MinValue;
+
         private bool IsDamageableTarget(Entity entity)
         {
             return entity != player && entity is not global::Celeste.Player
@@ -833,6 +839,13 @@ namespace Celeste.Entities
                 return;
 
             method.Invoke(target, new object[] { damage });
+
+            // Hit streak: consecutive hits landed within KirbyHitStreakWindow of
+            // each other. Display only -- it doesn't change the damage dealt.
+            float now = level?.TimeActive ?? 0f;
+            kirbyHitStreak = now - kirbyLastHitTime <= KirbyHitStreakWindow ? kirbyHitStreak + 1 : 1;
+            kirbyLastHitTime = now;
+            level?.Add(new KirbyDamageNumber(target.Center, damage, kirbyHitStreak));
 
             level?.Displacement.AddBurst(target.Center, .2f, 4, 24, .2f, Ease.QuadOut, Ease.QuadOut);
             Dust.Burst(target.Center, knockbackDir.Angle(), 4);
@@ -911,7 +924,8 @@ namespace Celeste.Entities
                 from + direction * 8f,
                 direction * KirbyStarSpitSpeed,
                 this,
-                KirbyStarSpitDamage));
+                KirbyStarSpitDamage,
+                kirbyInhaledStarSize));
 
             level?.ParticlesFG.Emit(global::Celeste.Player.P_DashA, 4, from + direction * 8f, Vector2.One * 4, direction.Angle());
             level?.Displacement.AddBurst(from + direction * 8f, .3f, 4, 24, .3f, Ease.QuadOut, Ease.QuadOut);
@@ -1210,6 +1224,9 @@ namespace Celeste.Entities
     /// </summary>
     public class InhaleableComponent : Component
     {
+        /// <summary>Size of the star Kirby spits after swallowing this: 0 = small, 1 = medium, 2 = large.</summary>
+        public int StarSize = 1;
+
         public InhaleableComponent()
             : base(active: true, visible: false)
         {

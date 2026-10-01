@@ -6,13 +6,13 @@ own movement kit, health system, and map-editor entities.
 
 ## What it does
 
-- **`K_Player`** — a standalone `Actor` (not a `Celeste.Player` subclass) that
-  reimplements Madeline's full move set (dash, climb, wall-jump, dream-dash,
-  swimming, room transitions, ...) plus Kirby-specific mechanics: multi-flap
-  hover flight, inhale/spit, and a star-projectile attack (`PlayerStarBullet`).
-  A hidden vanilla `Celeste.Player` "shadow" is kept in sync behind the scenes
-  so vanilla systems that only know how to collide with `Player`
-  (springs, boosters, dream blocks, triggers, ...) keep working unmodified.
+- **Kirby** — `KirbyPlayerController` is a component attached to the real
+  vanilla `Celeste.Player`, so all of Madeline's move set and every vanilla
+  system (springs, boosters, dream blocks, triggers, room transitions, ...)
+  keeps working unmodified. On top of that Kirby gets multi-flap hover flight
+  (on Jump, or its own bindable Float button), inhale (ground or air), and a
+  star-spit attack (`PlayerStarBullet`) whose star size depends on what was
+  swallowed, with floating damage numbers and a hit streak counter.
 - **Player switching** — `PlayerSelectionManager` lets a map (or the mod's own
   settings) choose Kirby or Madeline as the active character, with per-level
   overrides and a `K_PlayerTrigger` map entity to swap mid-level.

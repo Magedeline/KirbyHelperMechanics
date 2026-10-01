@@ -18,15 +18,20 @@ namespace Celeste.Projectiles
         private readonly KirbyPlayerController owner;
         private readonly int damage;
         private float rotation;
+        private readonly MTexture texture;
 
-        public PlayerStarBullet(Vector2 position, Vector2 velocity, KirbyPlayerController owner, int damage)
+        /// <param name="size">0 = small (16px), 1 = medium (24px), 2 = large (32px) -- see projectiles/KHM/kirby/star/.</param>
+        public PlayerStarBullet(Vector2 position, Vector2 velocity, KirbyPlayerController owner, int damage, int size = 1)
             : base(position)
         {
             this.velocity = velocity;
             this.owner = owner;
             this.damage = damage;
             Depth = -50;
-            Collider = new Circle(6f);
+
+            size = Calc.Clamp(size, 0, 2);
+            Collider = new Circle(6f + size * 4f);
+            texture = GFX.Game["projectiles/KHM/kirby/star/" + (size == 0 ? "small" : size == 1 ? "medium" : "large")];
         }
 
         public override void Update()
@@ -34,13 +39,20 @@ namespace Celeste.Projectiles
             base.Update();
 
             Position += velocity * Engine.DeltaTime;
-            rotation += Engine.DeltaTime * 8f;
+            // Spins in its direction of travel (clockwise when flying right).
+            rotation += Engine.DeltaTime * 14f * (velocity.X < 0f ? -1f : 1f);
 
             // Trail
             if (Scene.OnInterval(0.04f))
                 (Scene as Level)?.ParticlesFG.Emit(ParticleTypes.SparkyDust, Position);
 
-            // Travels indefinitely until it physically hits something -- no timeout.
+            // No timeout, but a star that leaves the room is gone for good.
+            if (Scene is Level level && !level.IsInBounds(Position, 32f))
+            {
+                RemoveSelf();
+                return;
+            }
+
             if (CollideCheck<Solid>())
             {
                 Burst();
@@ -68,8 +80,7 @@ namespace Celeste.Projectiles
             base.Render();
             // Draw a yellow spinning star using the same particle sprite as BossStarProjectile.
             // Falls back gracefully if no atlas texture is set — the trail particles still show.
-            GFX.Game.GetAtlasSubtexturesAt("projectiles/kirby/star/idle", 0)
-                ?.DrawCentered(Position, Color.White, 1f, rotation);
+            texture.DrawCentered(Position, Color.White, 1f, rotation);
         }
 
         private void Burst()

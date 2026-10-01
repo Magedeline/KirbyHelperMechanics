@@ -217,8 +217,6 @@ namespace Celeste.Mod.KirbyHelperMechanics
             {
                 if (kpc.CheckInhaleEntry())
                     return kpc.StKirbyInhale;
-                if (kpc.CheckDoubleJumpEntry())
-                    return global::Celeste.Player.StNormal;
                 if (kpc.CheckFloatEntry())
                     return kpc.StKirbyFloat;
             }
@@ -242,8 +240,6 @@ namespace Celeste.Mod.KirbyHelperMechanics
             var kpc = self.Get<KirbyPlayerController>();
             if (kpc != null)
             {
-                if (kpc.CheckDoubleJumpEntry())
-                    return global::Celeste.Player.StNormal;
                 if (kpc.CheckFloatEntry())
                     return kpc.StKirbyFloat;
             }
