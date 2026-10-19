@@ -248,6 +248,12 @@ namespace Celeste.Entities
 
         internal void PreUpdate()
         {
+            // See KirbyPlayerHooks.OnPlayerRender: the Hair component can be
+            // swapped out from under us by Player.ResetSprite, so keep it
+            // hidden (and not simulating) for as long as Kirby is attached.
+            if (player.Hair != null && player.Hair.Visible)
+                player.Hair.Visible = false;
+
             floatPressedFresh = FloatCheck && !prevFloatCheck;
             kirbyWasOnGroundBeforeUpdate = player.onGround;
 

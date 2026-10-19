@@ -127,6 +127,13 @@ namespace Celeste.Mod.KirbyHelperMechanics
 
             bool wasVisible = self.Sprite.Visible;
             self.Sprite.Visible = false;
+            // Re-assert every draw, not just once in Added(): vanilla's
+            // ResetSprite (backpack/skin changes, variants, other mods'
+            // reskins) replaces Hair with a brand-new, visible PlayerHair, so
+            // a one-time Visible=false left Madeline's bangs floating on
+            // Kirby's head after any such reset.
+            if (self.Hair != null)
+                self.Hair.Visible = false;
             orig(self);
             self.Sprite.Visible = wasVisible;
 
