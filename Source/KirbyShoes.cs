@@ -21,23 +21,25 @@ namespace Celeste.Entities
     /// frame (there is no separate shoes layer), so this works as a per-frame
     /// recolor overlay: the first time a given atlas frame is drawn, its pixels
     /// are read back once and a small mask texture is built holding just the
-    /// shoe pixels (crimson-family pixels in the bottom <see cref="FeetRows"/>
-    /// rows of the frame's opaque bounding box -- the cheeks and mouth sit
-    /// higher up, the pink body is nowhere near crimson). That mask is cached
-    /// forever and drawn over the body with the same position/origin/scale/
-    /// flip as the body sprite, tinted with the hair color, preserving the
-    /// original shading as a brightness ramp.
+    /// shoe pixels. In this art the shoes are the only crimson thing on Kirby
+    /// (hands are pink; the blush/mouth are one or two crimson pixels each), so
+    /// a shoe pixel is any crimson-family pixel belonging to a connected blob
+    /// of at least <see cref="MinShoeBlobPixels"/> pixels -- no position
+    /// assumptions, which keeps feet recolored in the tumbling/float/roll
+    /// frames where they are nowhere near the bottom of the sprite. That mask
+    /// is cached forever and drawn over the body with the same position/
+    /// origin/scale/flip as the body sprite, tinted with the hair color,
+    /// preserving the original shading as a brightness ramp.
     /// </para>
     /// </summary>
     public class KirbyShoes : Component
     {
         /// <summary>
-        /// How many rows up from the bottom of a frame's opaque bounding box
-        /// count as "shoes". Two covers the sole plus its highlight row in the
-        /// idle/walk/run/jump/float frames; three would start catching the
-        /// cheeks in the standing frames.
+        /// Smallest 8-connected crimson blob that counts as a shoe. The blush
+        /// dots and mouth corners are 1-2 pixels; the smallest real shoe
+        /// (a sideways sole in the fall frames) is 3.
         /// </summary>
-        private const int FeetRows = 2;
+        private const int MinShoeBlobPixels = 3;
 
         // Luma of AE0449, the main shoe fill color in the idle frame -- pixels
         // are shaded relative to it so darker outline pixels stay darker.
@@ -97,12 +99,14 @@ namespace Celeste.Entities
         }
 
         /// <summary>
-        /// True for the crimson family the shoes are painted in (strong red,
-        /// weak green, blue no stronger than red). The pink body (green ~0xA0)
-        /// and the black outline never match.
+        /// True for the crimson family the shoes are painted in: strong red,
+        /// weak green, blue clearly below red. The pink body (green ~0xA0),
+        /// the black outline, the pinker hand highlights (green >= 0x4B) and
+        /// pure magenta placeholders never match; the shoes' own lighter
+        /// highlight (F8449A, green 0x44) still does.
         /// </summary>
         private static bool IsShoeColor(Color c) =>
-            c.R >= 0x60 && c.G <= 0x50 && c.B <= c.R && c.R - c.G >= 0x60;
+            c.R >= 0x60 && c.G <= 0x46 && c.B * 4 <= c.R * 3 && c.R - c.G >= 0x60;
 
         private static Texture2D GetMask(MTexture frame)
         {
@@ -142,40 +146,56 @@ namespace Celeste.Entities
             Color[] pixels = new Color[w * h];
             source.GetData(0, clip, pixels, 0, pixels.Length);
 
-            int bottom = -1;
-            for (int y = h - 1; y >= 0 && bottom < 0; y--)
+            // Label 8-connected blobs of crimson pixels, then keep only the
+            // blobs big enough to be a shoe (see MinShoeBlobPixels).
+            int[] blob = new int[w * h];
+            List<int> blobSizes = new List<int> { 0 };
+            Stack<int> stack = new Stack<int>();
+            for (int i = 0; i < pixels.Length; i++)
             {
-                for (int x = 0; x < w; x++)
+                if (blob[i] != 0 || pixels[i].A == 0 || !IsShoeColor(pixels[i]))
+                    continue;
+
+                int id = blobSizes.Count;
+                blobSizes.Add(0);
+                blob[i] = id;
+                stack.Push(i);
+                while (stack.Count > 0)
                 {
-                    if (pixels[y * w + x].A > 0)
+                    int p = stack.Pop();
+                    blobSizes[id]++;
+                    int px = p % w, py = p / w;
+                    for (int dy = -1; dy <= 1; dy++)
                     {
-                        bottom = y;
-                        break;
+                        for (int dx = -1; dx <= 1; dx++)
+                        {
+                            int nx = px + dx, ny = py + dy;
+                            if (nx < 0 || ny < 0 || nx >= w || ny >= h)
+                                continue;
+                            int n = ny * w + nx;
+                            if (blob[n] != 0 || pixels[n].A == 0 || !IsShoeColor(pixels[n]))
+                                continue;
+                            blob[n] = id;
+                            stack.Push(n);
+                        }
                     }
                 }
             }
-            if (bottom < 0)
-                return null;
 
             Color[] maskPixels = new Color[w * h];
             bool any = false;
-            int top = Math.Max(0, bottom - FeetRows + 1);
-            for (int y = top; y <= bottom; y++)
+            for (int i = 0; i < pixels.Length; i++)
             {
-                for (int x = 0; x < w; x++)
-                {
-                    Color c = pixels[y * w + x];
-                    if (c.A == 0 || !IsShoeColor(c))
-                        continue;
+                if (blob[i] == 0 || blobSizes[blob[i]] < MinShoeBlobPixels)
+                    continue;
 
-                    float luma = 0.30f * c.R + 0.59f * c.G + 0.11f * c.B;
-                    float shade = Calc.Clamp(luma / ReferenceLuma, MinShade, 1f);
-                    byte v = (byte)Math.Round(shade * 255f);
-                    maskPixels[y * w + x] = new Color(v, v, v, (byte)255);
-                    any = true;
-                }
-            }
-            if (!any)
+                Color c = pixels[i];
+                float luma = 0.30f * c.R + 0.59f * c.G + 0.11f * c.B;
+                float shade = Calc.Clamp(luma / ReferenceLuma, MinShade, 1f);
+                byte v = (byte)Math.Round(shade * 255f);
+                maskPixels[i] = new Color(v, v, v, (byte)255);
+                any = true;
+            }            if (!any)
                 return null;
 
             var mask = new Texture2D(Engine.Instance.GraphicsDevice, w, h);
