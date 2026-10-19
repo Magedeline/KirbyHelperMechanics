@@ -136,6 +136,17 @@ public class PlayerSelectionManager : Entity
     }
 
     /// <summary>
+    /// Drops the per-level override without firing OnPlayerSelectionChanged --
+    /// for level exit, when there is no live Player left to resync and the
+    /// next map's own Player.Added will resolve the selection fresh.
+    /// </summary>
+    public static void ClearLevelOverride()
+    {
+        if (Instance != null)
+            Instance.levelOverride = null;
+    }
+
+    /// <summary>
     /// Check if a given player type is currently selected.
     /// </summary>
     public static bool IsPlayerSelected(PlayerType playerType)

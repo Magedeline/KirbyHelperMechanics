@@ -13,6 +13,12 @@ namespace Celeste.Mod.KirbyHelperMechanics
 {
     public class KirbyHelperMechanicsModuleSettings : EverestModuleSettings
     {
+        /// <summary>
+        /// Flap charges Kirby gets per airtime (Float entry costs one, every
+        /// extra flap costs one more). Needs the range attribute to show up in
+        /// Mod Options at all -- Everest silently skips int settings without one.
+        /// </summary>
+        [SettingRange(1, 10)]
         public int KirbyMaxFloatJumps { get; set; } = 5;
 
         /// <summary>
