@@ -19,9 +19,9 @@ namespace Celeste.Entities
     /// Kirby Actor and no hidden "shadow" Player anymore, so vanilla's own triggers,
     /// collisions, room transitions, and cutscene systems all apply to Kirby for free.
     /// <para>
-    /// Kirby's own abilities (float/hover, inhale, star-spit) are not implemented here
-    /// yet -- until they're ported (see the phased rewrite plan), Kirby plays with
-    /// unmodified vanilla Player physics, just reskinned.
+    /// Kirby's own abilities (Float hover, Inhale, Star Spit, the wave dash buff) are
+    /// custom StateMachine states / hooks layered on top of vanilla's Player physics,
+    /// which otherwise runs unmodified.
     /// </para>
     /// </summary>
     public class KirbyPlayerController : Component
@@ -132,7 +132,7 @@ namespace Celeste.Entities
 
             KirbySprite = KirbyHelperMechanicsModule.KirbySpriteBank.Create(K_PlayerAnimIds.SpriteBankId);
             KirbySprite.Visible = false; // drawn manually by KirbyPlayerHooks' Render hook, not auto-rendered
-            Shoes = new KirbyShoes(player);
+            Shoes = new KirbyShoes(player, KirbySprite);
 
             // Monocle.StateMachine.AddState(name, onUpdate, coroutine, begin, end)
             // grows the REAL Player's own StateMachine and returns a fresh state ID
@@ -145,11 +145,29 @@ namespace Celeste.Entities
             StKirbyFloat = player.StateMachine.AddState("KirbyFloat", KirbyFloatUpdate, null, KirbyFloatBegin, KirbyFloatEnd);
             StKirbyInhale = player.StateMachine.AddState("KirbyInhale", KirbyInhaleUpdate, KirbyInhaleCoroutine, KirbyInhaleBegin, KirbyInhaleEnd);
             StKirbyStarSpit = player.StateMachine.AddState("KirbyStarSpit", KirbyStarSpitUpdate, KirbyStarSpitCoroutine, KirbyStarSpitBegin, KirbyStarSpitEnd);
+
+            // Monocle's Component.Added(Entity) does NOT fire EntityAdded(Scene)
+            // -- that only runs from Entity.Added, i.e. when the *entity* enters
+            // the scene. KirbyPlayerHooks always attaches this component after
+            // the Player's own Added has already run, so EntityAdded below never
+            // fired in practice: level stayed null (star spit / puff / particles
+            // silently no-op'd) and the HP system was never enabled. Do the
+            // scene-side setup here whenever the host is already in a Level.
+            if (player.Scene is Level alreadyIn)
+                OnEnteredLevel(alreadyIn);
         }
 
         #region Kirby Float (hover) -- ported from legacy K_Player.KirbyFloatBegin/Update/End
 
         private const float KirbyFloatSpeed = -35f;
+        // Cap on how much existing upward momentum Float entry preserves.
+        // Jump height still carries into the float (vanilla's jump impulse is
+        // -105), but an up-dash's full -240 no longer does: under Float's own
+        // 45 px/s^2 gravity that much carried speed kept climbing for the whole
+        // 1.5 s hold cap (~300 px, nearly two screens) before the float even
+        // started to sink -- an up-dash + float was a bigger vertical move than
+        // anything else in the kit.
+        private const float KirbyFloatMaxCarrySpeed = -120f;
         // A true 0-sink hover (briefly shipped) let Kirby camp motionless
         // indefinitely -- this is a compromise: still a much gentler sink than
         // the original 18f, but no longer a perfect stall.
@@ -166,10 +184,6 @@ namespace Celeste.Entities
         // to camp in place for long. Resets to full every time float is
         // (re-)entered from grounded.
         private const float KirbyFloatMaxDuration = 1.5f;
-
-        // Double jump's Jump() impulse (vanilla Speed.Y = -105) multiplied by
-        // this to make Kirby's mid-air jump noticeably stronger than a grounded one.
-        private const float KirbyDoubleJumpPower = 1.3f;
 
         // Cap on the progressive flap cost in KirbyFloatBegin (see
         // kirbyFloatEntriesThisAirtime) -- without a cap, a large
@@ -188,13 +202,6 @@ namespace Celeste.Entities
         // looped indefinitely to stall in the air for free.
         private int kirbyFloatEntriesThisAirtime;
 
-        // One free mid-air jump (real Jump() impulse, not a Float hover), usable
-        // whenever Kirby is airborne without coyote/wall-jump options. Tracked
-        // separately from kirbyFlapCount -- Float is the flap-metered hover
-        // ability, this is a single discrete "double jump" -- and refills only
-        // on landing, same as flaps.
-        private bool kirbyDoubleJumpUsed;
-
         // Rising-edge jump detection: Kirby's air abilities must only trigger on a
         // FRESH jump press, not a buffered one (a press made just before landing or
         // reaching a wall is reserved for vanilla jumps so jump buffering still
@@ -203,10 +210,10 @@ namespace Celeste.Entities
         // NOT from this Component's own Update(), because Monocle updates
         // Components in add-order and StateMachine (added in Player's constructor,
         // long before this component exists) would otherwise run NormalUpdate
-        // BEFORE this component's Update() recomputed jumpPressedFresh for the
+        // BEFORE this component's Update() recomputed floatPressedFresh for the
         // frame, reading last frame's stale value.
-        private bool prevJumpCheck;
-        private bool jumpPressedFresh;
+        private bool prevFloatCheck;
+        private bool floatPressedFresh;
         private bool kirbyWasOnGroundBeforeUpdate;
 
         // Generic "just got bounced" detector -- covers vanilla Springs, ice
@@ -227,7 +234,7 @@ namespace Celeste.Entities
 
         /// <summary>
         /// True while it's unsafe to steal the current jump press into a Float
-        /// hover or double jump -- either vanilla's own AutoJump wants it (see
+        /// float button or hover -- either vanilla's own AutoJump wants it (see
         /// CheckFloatEntry), or Kirby was just bounced by some spring/enemy/pad
         /// this frame or last (see kirbyBounceGraceTimer above).
         /// </summary>
@@ -241,7 +248,7 @@ namespace Celeste.Entities
 
         internal void PreUpdate()
         {
-            jumpPressedFresh = Input.Jump.Check && !prevJumpCheck;
+            floatPressedFresh = FloatCheck && !prevFloatCheck;
             kirbyWasOnGroundBeforeUpdate = player.onGround;
 
             if (kirbyBounceGraceTimer > 0f)
@@ -256,21 +263,66 @@ namespace Celeste.Entities
             if (!player.onGround && kirbyPrevFrameSpeedY - player.Speed.Y > KirbyBounceDetectThreshold)
                 kirbyBounceGraceTimer = KirbyBounceGraceTime;
 
-            // Flaps and the double jump fully refill while grounded, mirroring
+            // Flaps fully refill while grounded, mirroring
             // the legacy K_Player's per-frame "onGround -> reset to max" behavior.
             if (player.onGround)
             {
                 kirbyFlapCount = KirbyHelperMechanicsModule.Settings?.KirbyMaxFloatJumps ?? 5;
-                kirbyDoubleJumpUsed = false;
                 kirbyFloatEntriesThisAirtime = 0;
             }
         }
 
         internal void PostUpdate()
         {
-            prevJumpCheck = Input.Jump.Check;
+            prevFloatCheck = FloatCheck;
             kirbyPrevFrameSpeedY = player.Speed.Y;
             UpdateKirbyWaveDash();
+        }
+
+        /// <summary>
+        /// Dedicated Float button, or null to fall back to Jump. This lets
+        /// players move Float to a separate button without changing the normal
+        /// jump, wall-jump, or jump-buffer behavior.
+        /// <para>
+        /// "Unbound" has to be checked on the binding's contents, not on the
+        /// property being null: Everest always instantiates every ButtonBinding
+        /// setting (with an empty key/button list when the default is
+        /// Keys.None), so a plain null-coalesce never fell back and Float was
+        /// unreachable until the player went and bound the new button.
+        /// </para>
+        /// </summary>
+        private static ButtonBinding FloatButton
+        {
+            get
+            {
+                ButtonBinding binding = KirbyHelperMechanicsModule.Settings?.KirbyFloatButton;
+                return IsBound(binding) ? binding : null;
+            }
+        }
+
+        private static bool IsBound(ButtonBinding binding)
+        {
+            if (binding == null)
+                return false;
+            if (binding.Keys != null && binding.Keys.Any(k => k != Microsoft.Xna.Framework.Input.Keys.None))
+                return true;
+            if (binding.Buttons != null && binding.Buttons.Any(b => b != 0))
+                return true;
+            if (binding.MouseButtons != null && binding.MouseButtons.Count > 0)
+                return true;
+            return false;
+        }
+
+        private static bool FloatPressed => FloatButton?.Pressed ?? Input.Jump.Pressed;
+        private static bool FloatCheck => FloatButton?.Check ?? Input.Jump.Check;
+
+        private static void ConsumeFloatBuffer()
+        {
+            ButtonBinding binding = FloatButton;
+            if (binding != null)
+                binding.ConsumeBuffer();
+            else
+                Input.Jump.ConsumeBuffer();
         }
 
         /// <summary>
@@ -289,53 +341,19 @@ namespace Celeste.Entities
         {
             if (player.onGround || player.Holding != null)
                 return false;
-            if (!Input.Jump.Pressed || !jumpPressedFresh || player.jumpGraceTimer > 0f)
+            if (!FloatPressed || !floatPressedFresh || player.jumpGraceTimer > 0f)
                 return false;
             if (player.WallJumpCheck(1) || player.WallJumpCheck(-1))
                 return false;
             if (kirbyFlapCount <= 0)
                 return false;
             // Just bounced off a spring/enemy/pad -- see KirbyJustBounced.
-            // Stealing this jump press into a Float hover fights the bounce
-            // combo: the player presses jump to ride the bounce higher and
-            // instead gets puffed up mid-air. Let vanilla's own bounce-jump
-            // handling (or a plain jump) win instead.
+            // Stealing this float-button press fights the bounce combo, so let
+            // vanilla's own bounce-jump handling (or a plain jump) win instead.
             if (KirbyJustBounced)
                 return false;
 
-            Input.Jump.ConsumeBuffer();
-            return true;
-        }
-
-        /// <summary>
-        /// Entry condition for Kirby's one-charge mid-air double jump -- a real
-        /// <see cref="global::Celeste.Player.Jump"/> impulse (not a Float hover),
-        /// usable once per airtime before Float's flap-metered hover takes over.
-        /// Checked from the same two hooks as <see cref="CheckFloatEntry"/> and
-        /// BEFORE it, so the first airborne jump press is a genuine jump and only
-        /// later presses spend flaps entering Float. <see cref="global::Celeste.Player.Jump"/>
-        /// consumes the jump buffer itself, so no separate ConsumeBuffer call is
-        /// needed here.
-        /// </summary>
-        internal bool CheckDoubleJumpEntry()
-        {
-            if (player.onGround || player.Holding != null)
-                return false;
-            if (!Input.Jump.Pressed || !jumpPressedFresh || player.jumpGraceTimer > 0f)
-                return false;
-            if (player.WallJumpCheck(1) || player.WallJumpCheck(-1))
-                return false;
-            if (kirbyDoubleJumpUsed)
-                return false;
-            // See CheckFloatEntry: don't steal a post-bounce jump press.
-            if (KirbyJustBounced)
-                return false;
-
-            kirbyDoubleJumpUsed = true;
-            player.Jump();
-            // Jump() sets Speed.Y to vanilla's fixed -105 -- scale it up so
-            // Kirby's mid-air jump has noticeably more power than a grounded one.
-            player.Speed.Y *= KirbyDoubleJumpPower;
+            ConsumeFloatBuffer();
             return true;
         }
 
@@ -366,9 +384,11 @@ namespace Celeste.Entities
             kirbyFlapScaleTimer = KirbyFlapScaleTime;
             kirbyFloatDurationTimer = KirbyFloatMaxDuration;
 
-            // Initial upward kick -- preserves stronger upward momentum so
-            // jump/dash height carries into the float instead of being clipped.
-            player.Speed.Y = Math.Min(player.Speed.Y, KirbyFloatSpeed);
+            // Initial upward kick -- preserves stronger upward momentum (up to
+            // KirbyFloatMaxCarrySpeed) so jump height carries into the float
+            // instead of being clipped, without letting a full up-dash's speed
+            // ride Float's near-zero gravity for the whole hold.
+            player.Speed.Y = Math.Max(Math.Min(player.Speed.Y, KirbyFloatSpeed), KirbyFloatMaxCarrySpeed);
             player.varJumpTimer = 0;
 
             // Puffed-up squash on entry.
@@ -425,22 +445,32 @@ namespace Celeste.Entities
             if (Input.Jump.Pressed)
             {
                 // Wall jump escape: floating against a wall jumps off it, exactly
-                // like Madeline would.
+                // like Madeline would. Consume the buffered press the same way
+                // vanilla's NormalUpdate does before its own WallJump -- otherwise
+                // the still-buffered press re-fires a second wall jump from
+                // NormalUpdate next frame (Kirby is still within WallJumpCheck's
+                // 3px of the wall), doubling the sound/particles.
                 if (player.WallJumpCheck(1))
                 {
+                    Input.Jump.ConsumeBuffer();
                     player.WallJump(-1);
                     return global::Celeste.Player.StNormal;
                 }
                 if (player.WallJumpCheck(-1))
                 {
+                    Input.Jump.ConsumeBuffer();
                     player.WallJump(1);
                     return global::Celeste.Player.StNormal;
                 }
+            }
 
-                // Additional flap: press jump again to bounce upward (costs a flap).
+            if (FloatPressed)
+            {
+                // Additional flap: press the Float button again to bounce upward
+                // (costs a flap).
                 if (kirbyFlapCount > 0)
                 {
-                    Input.Jump.ConsumeBuffer();
+                    ConsumeFloatBuffer();
                     kirbyFlapCount = Math.Max(0, kirbyFlapCount - 1);
                     kirbyFlapScaleTimer = KirbyFlapScaleTime;
 
@@ -923,28 +953,56 @@ namespace Celeste.Entities
         {
             if (player != null)
             {
+                // A mid-ability swap to Madeline (K_PlayerTrigger, toggle button)
+                // must not leave the Player parked in a Kirby-only state: the
+                // AddState'd callbacks stay registered on the StateMachine and
+                // would keep running Float/Inhale/StarSpit for a Kirby that is no
+                // longer attached.
+                if (InKirbyAbilityState)
+                    player.StateMachine.State = global::Celeste.Player.StNormal;
+
                 player.Hair.Visible = true;
                 player.Hair.SimulateMotion = true;
             }
+
+            // Component.Removed(Entity) likewise never reaches EntityRemoved when
+            // the entity stays in the scene (see OnEnteredLevel's doc comment).
+            OnLeftLevel();
             base.Removed(entity);
+        }
+
+        /// <summary>
+        /// Scene-side setup: resolves the Level and switches the HP system on.
+        /// Reached from <see cref="Added"/> (the normal case -- the host Player
+        /// is already in its Level when KirbyPlayerHooks attaches this) and from
+        /// <see cref="EntityAdded"/> (only if the component were ever attached
+        /// to a Player before that Player entered a scene).
+        /// </summary>
+        private void OnEnteredLevel(Level scene)
+        {
+            level = scene;
+            if (level == null)
+                return;
+
+            var healthManager = K_PlayerHealthManager.GetOrCreate(level, MaxHealth);
+            healthManager?.EnableKirbyMode(MaxHealth);
+        }
+
+        private void OnLeftLevel()
+        {
+            K_PlayerHealthManager.Instance?.DisableKirbyMode();
+            level = null;
         }
 
         public override void EntityAdded(Scene scene)
         {
             base.EntityAdded(scene);
-            level = scene as Level;
-
-            if (level != null)
-            {
-                var healthManager = K_PlayerHealthManager.GetOrCreate(level, MaxHealth);
-                healthManager?.EnableKirbyMode(MaxHealth);
-            }
+            OnEnteredLevel(scene as Level);
         }
 
         public override void EntityRemoved(Scene scene)
         {
-            K_PlayerHealthManager.Instance?.DisableKirbyMode();
-
+            OnLeftLevel();
             base.EntityRemoved(scene);
         }
 
@@ -957,11 +1015,59 @@ namespace Celeste.Entities
             // timer on its own -- without this call every Kirby animation freezes on
             // its first frame instead of playing like Madeline's own sprite does.
             KirbySprite?.Update();
+
+            if (kirbyHurtAnimTimer > 0f)
+                kirbyHurtAnimTimer -= Engine.DeltaTime;
             // All other per-frame physics/ability logic runs via KirbyPlayerHooks'
             // On.Celeste.Player.Update/NormalUpdate hooks (PreUpdate/PostUpdate/
             // CheckFloatEntry/CheckInhaleEntry) and the StateMachine callbacks
             // registered in Added() -- nothing else to do here.
         }
+
+        #region Damage reaction
+
+        // Knockback applied when a hazard lands a hit (see
+        // K_PlayerHealthManager.TryDamagePlayer): a short hop away from the
+        // source, so Kirby is actually separated from whatever hurt him instead
+        // of sitting inside it until the i-frames run out.
+        private const float KirbyHurtKnockbackX = 120f;
+        private const float KirbyHurtKnockbackY = -90f;
+        // How long the kirby_damage animation overrides the vanilla-id mirroring
+        // in SyncKirbySpriteFromVanilla (the clip itself is 2 frames @ 0.08s).
+        private const float KirbyHurtAnimTime = 0.2f;
+
+        private float kirbyHurtAnimTimer;
+
+        /// <summary>
+        /// Hit reaction for a non-lethal hit. Called by
+        /// <see cref="K_PlayerHealthManager.TryDamagePlayer"/> after HP was
+        /// actually deducted; the post-hit blink itself is driven by the
+        /// manager's invulnerability timer (see <see cref="RenderKirbyOverlay"/>).
+        /// </summary>
+        internal void OnDamaged(Vector2 awayFromSource)
+        {
+            // A hit always knocks Kirby out of his own ability states -- Float
+            // in particular keeps re-asserting Speed.Y every frame and would
+            // swallow the knockback entirely.
+            if (InKirbyAbilityState)
+                player.StateMachine.State = global::Celeste.Player.StNormal;
+
+            int dirX = Math.Sign(awayFromSource.X);
+            if (dirX == 0)
+                dirX = -(int)player.Facing;
+
+            player.Speed = new Vector2(dirX * KirbyHurtKnockbackX, KirbyHurtKnockbackY);
+            player.varJumpTimer = 0f;
+
+            kirbyHurtAnimTimer = KirbyHurtAnimTime;
+            KirbySprite?.Play(K_PlayerAnimIds.Damage);
+
+            Audio.Play("event:/game/general/thing_booped", player.Position);
+            Input.Rumble(RumbleStrength.Medium, RumbleLength.Short);
+            level?.Shake(0.2f);
+        }
+
+        #endregion
 
         /// <summary>
         /// True while a Kirby-only ability state (Float/Inhale/StarSpit) is
@@ -976,7 +1082,7 @@ namespace Celeste.Entities
             (StKirbyStarSpit >= 0 && player.StateMachine.State == StKirbyStarSpit);
 
         /// <summary>
-        /// Draws <see cref="KirbySprite"/> and <see cref="Shoes"/> in place of the
+        /// Draws <see cref="KirbySprite"/> (then <see cref="Shoes"/> over it) in place of the
         /// vanilla sprite. Called from <see cref="KirbyPlayerHooks"/>' Player.Render
         /// hook, after vanilla's own Render() has run with the real sprite hidden.
         /// Outside a Kirby-only ability state, KirbySprite mirrors whatever
@@ -987,13 +1093,19 @@ namespace Celeste.Entities
         /// </summary>
         internal void RenderKirbyOverlay()
         {
-            Shoes?.Render();
-
             if (KirbySprite == null)
+                return;
+
+            // Post-hit blink: skip the whole draw on alternating slices of the
+            // invulnerability window.
+            if (K_PlayerHealthManager.Instance?.BlinkHidden == true)
                 return;
 
             SyncKirbySpriteFromVanilla();
             KirbySprite.Render();
+            // Shoes are a recolor overlay over the body's own foot pixels, so
+            // they go on top, with the exact same transform.
+            Shoes?.Render();
         }
 
         /// <summary>
@@ -1005,14 +1117,18 @@ namespace Celeste.Entities
         /// </summary>
         private void SyncKirbySpriteFromVanilla()
         {
-            if (!InKirbyAbilityState)
+            if (!InKirbyAbilityState && kirbyHurtAnimTimer <= 0f)
             {
                 string vanillaId = player.Sprite.CurrentAnimationID;
                 if (!string.IsNullOrEmpty(vanillaId) && KirbySprite.CurrentAnimationID != vanillaId && KirbySprite.Has(vanillaId))
                     KirbySprite.Play(vanillaId);
             }
 
-            KirbySprite.RenderPosition = player.Sprite.RenderPosition;
+            // Vanilla floors the sprite position for its own draw (Player.Render
+            // snapshots and restores it around base.Render), so match that --
+            // drawing at the raw sub-pixel position makes Kirby jitter against
+            // the pixel grid relative to everything else.
+            KirbySprite.RenderPosition = player.Sprite.RenderPosition.Floor();
             KirbySprite.Scale = player.Sprite.Scale;
             KirbySprite.Rotation = player.Sprite.Rotation;
             // Never copied before -- KirbySprite always rendered in its default
@@ -1021,10 +1137,10 @@ namespace Celeste.Entities
             // uses for its own sprite.
             KirbySprite.FlipX = player.Facing == Facings.Left;
             // idle00.png etc are fully painted art (pink body, red cheeks/feet,
-            // black eyes), not a white silhouette like vanilla hair or the shoes
-            // sprite -- multiplying the whole body by a flat dash-tier color turns
-            // it into a solid-color blob. Only mirror vanilla's own flash-effect
-            // tinting (hurt/bounce/etc), never apply KirbyDashColors here.
+            // black eyes), not a white silhouette like vanilla hair -- tinting
+            // the whole body by the hair color would turn it into a solid blob.
+            // Only mirror vanilla's own flash-effect tinting (tired flash etc);
+            // the hair-color dash indicator lives on the shoes (KirbyShoes).
             KirbySprite.Color = player.Sprite.Color;
         }
 

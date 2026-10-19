@@ -53,7 +53,7 @@ namespace Celeste.Mod.KirbyHelperMechanics
 
         /// <summary>
         /// Dedicated sprite bank built from Graphics/Pusheen2026/KHM/k_sprites.xml, holding
-        /// kirby_player_ext/kirby_shoes/etc. Kept as our own instance rather
+        /// kirby_player_ext/kirby_sweat/etc. Kept as our own instance rather
         /// than merged into the shared GFX.SpriteBank, because GFX.SpriteBank
         /// is still null when LoadContent runs (Everest calls mod LoadContent
         /// hooks before Celeste.GFX.Load() assigns it -- confirmed by direct
@@ -105,7 +105,7 @@ namespace Celeste.Mod.KirbyHelperMechanics
             // anything anywhere. Constructing our own SpriteBank directly from
             // the file, and keeping it as KirbySpriteBank instead of merging into
             // GFX.SpriteBank (which is still null at this point -- see the field
-            // doc comment), is what actually makes kirby_player_ext/kirby_shoes/
+            // doc comment), is what actually makes kirby_player_ext/kirby_sweat/
             // etc available.
             KirbySpriteBank = new Monocle.SpriteBank(GFX.Game, "Graphics/Pusheen2026/KHM/k_sprites.xml");
             // KirbyPlayerController rides the real vanilla Player, so it reads

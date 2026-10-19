@@ -363,16 +363,8 @@
       <Loop id="danger" path="danger" delay="0.06" frames="0-5" />
     </kirby_sweat>
 
-    <!-- Read by KirbyShoes.cs (GFX.SpriteBank.Create("kirby_shoes")). Single
-         10x10 frame (shoes00.png) directly under characters/KHM/kirby/, not
-         a subfolder. Origin is absolute pixels (bottom-center of the 10x10
-         canvas, one row up from the very bottom edge) so it lines up with
-         player.Sprite.RenderPosition, the same feet-anchor convention
-         kirby_player_ext uses, and mirrors correctly via Sprite.FlipX
-         without any manual per-facing position math. -->
-    <kirby_shoes path="characters/KHM/kirby/" start="idle">
-      <Origin x="5" y="9" />
-      <Loop id="idle" path="shoes" delay="0.1" frames="0" />
-    </kirby_shoes>
+    <!-- Kirby's shoes have no sprite of their own: KirbyShoes.cs recolors the
+         crimson foot pixels baked into every kirby_player_ext frame to the
+         player's live hair color (vanilla's dash-count indicator). -->
 
 </Sprites>

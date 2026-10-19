@@ -13,7 +13,23 @@ namespace Celeste.Mod.KirbyHelperMechanics
 {
     public class KirbyHelperMechanicsModuleSettings : EverestModuleSettings
     {
+        /// <summary>
+        /// Flap charges Kirby gets per airtime (Float entry costs one, every
+        /// extra flap costs one more). Needs the range attribute to show up in
+        /// Mod Options at all -- Everest silently skips int settings without one.
+        /// </summary>
+        [SettingRange(1, 10)]
         public int KirbyMaxFloatJumps { get; set; } = 5;
+
+        /// <summary>
+        /// Optional dedicated button for Kirby's puff/hover/float. When unbound,
+        /// Jump is used for backwards compatibility; binding this to another
+        /// button keeps vanilla's jump free for normal air movement.
+        /// </summary>
+        [SettingName("modoptions_kirbyhelpermechanics_floatbutton")]
+        [DefaultButtonBinding(0, Keys.None)]
+        public ButtonBinding KirbyFloatButton { get; set; }
+
         public bool GentleBreezeMode { get; set; } = false;
         public bool KirbyPlayerEnabled { get; set; } = true;
         public bool PlayerAutoSelect { get; set; } = false;

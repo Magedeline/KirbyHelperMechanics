@@ -16,7 +16,7 @@ public class PlayerSelectionManager : Entity
     /// <summary>Available player types in the system.</summary>
     public enum PlayerType
     {
-        /// <summary>Kirby - Kirby character with special abilities (double-jump, alternate dash, combat, hover)</summary>
+        /// <summary>Kirby - Kirby character with special abilities (flap/hover, alternate dash, combat, inhale)</summary>
         Kirby = 0,
         
         /// <summary>Madeline - Standard Celeste player without special abilities</summary>
@@ -133,6 +133,17 @@ public class PlayerSelectionManager : Entity
             var selected = GetSelectedPlayer();
             OnPlayerSelectionChanged?.Invoke(selected);
         }
+    }
+
+    /// <summary>
+    /// Drops the per-level override without firing OnPlayerSelectionChanged --
+    /// for level exit, when there is no live Player left to resync and the
+    /// next map's own Player.Added will resolve the selection fresh.
+    /// </summary>
+    public static void ClearLevelOverride()
+    {
+        if (Instance != null)
+            Instance.levelOverride = null;
     }
 
     /// <summary>
