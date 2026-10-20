@@ -61,11 +61,16 @@ namespace Celeste.Entities
             }
         }
 
+        // Looked up once: GetAtlasSubtexturesAt logs an Everest warning every frame the art is
+        // missing, and it is missing by design until someone draws it.
+        private static bool? hasPuffArt;
+
         public override void Render()
         {
             base.Render();
 
-            MTexture texture = GFX.Game.GetAtlasSubtexturesAt("particles/kirby/puff", 0);
+            hasPuffArt ??= GFX.Game.HasAtlasSubtexturesAt("particles/kirby/puff", 0);
+            MTexture texture = hasPuffArt.Value ? GFX.Game.GetAtlasSubtexturesAt("particles/kirby/puff", 0) : null;
             if (texture != null)
             {
                 texture.DrawCentered(Position, Color.White);
