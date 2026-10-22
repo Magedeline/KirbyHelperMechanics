@@ -5,3 +5,8 @@ Source/obj/
 bin/
 dist/
 *.user
+*.zip
+Audio/Master Bank.strings.bank
+Audio/Master Bank.bank
+Audio/Master Bank.bank
+Audio/Master Bank.strings.bank

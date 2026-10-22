@@ -34,8 +34,8 @@ namespace Celeste.Mod.KirbyHelperMechanics
             On.Celeste.Player.NormalUpdate += OnNormalUpdate;
             On.Celeste.Player.DashUpdate += OnDashUpdate;
             On.Celeste.Player.StartDash += OnStartDash;
-            On.Celeste.Player.Die += OnPlayerDie;
             On.Celeste.TrailManager.Add_Vector2_Image_PlayerHair_Vector2_Color_int_float_bool_bool += OnTrailManagerAdd;
+            Everest.Events.Level.OnExit += OnLevelExit;
             PlayerSelectionManager.OnPlayerSelectionChanged += OnPlayerSelectionChanged;
 
             KirbyPlayerController.Load();
@@ -53,11 +53,12 @@ namespace Celeste.Mod.KirbyHelperMechanics
             On.Celeste.Player.NormalUpdate -= OnNormalUpdate;
             On.Celeste.Player.DashUpdate -= OnDashUpdate;
             On.Celeste.Player.StartDash -= OnStartDash;
-            On.Celeste.Player.Die -= OnPlayerDie;
             On.Celeste.TrailManager.Add_Vector2_Image_PlayerHair_Vector2_Color_int_float_bool_bool -= OnTrailManagerAdd;
+            Everest.Events.Level.OnExit -= OnLevelExit;
             PlayerSelectionManager.OnPlayerSelectionChanged -= OnPlayerSelectionChanged;
 
             KirbyPlayerController.Unload();
+            KirbyShoes.ClearMaskCache();
             loaded = false;
         }
 
@@ -126,6 +127,13 @@ namespace Celeste.Mod.KirbyHelperMechanics
 
             bool wasVisible = self.Sprite.Visible;
             self.Sprite.Visible = false;
+            // Re-assert every draw, not just once in Added(): vanilla's
+            // ResetSprite (backpack/skin changes, variants, other mods'
+            // reskins) replaces Hair with a brand-new, visible PlayerHair, so
+            // a one-time Visible=false left Madeline's bangs floating on
+            // Kirby's head after any such reset.
+            if (self.Hair != null)
+                self.Hair.Visible = false;
             orig(self);
             self.Sprite.Visible = wasVisible;
 
@@ -178,26 +186,20 @@ namespace Celeste.Mod.KirbyHelperMechanics
         }
 
         /// <summary>
-        /// Retints the death shatter effect from Madeline's hair color to
-        /// Kirby's own dash-tier color. PlayerDeadBody captures self.Hair.Color
-        /// into its own field at construction time (inside orig()) and passes
-        /// that captured value to DeathEffect -- it does not keep a live
-        /// reference to Hair -- so swapping the color immediately before orig()
-        /// runs and restoring it right after changes only the death effect's
-        /// tint, without touching any of vanilla's own death/respawn timing or
-        /// logic (which still runs completely unmodified via orig()).
+        /// Leaving a map (to the overworld, a restart, or another map) drops the
+        /// whole Level scene without ever calling Removed on its entities, so
+        /// the two singletons that live inside it have to be told explicitly.
+        /// K_PlayerHealthManager would otherwise keep pointing at an entity in
+        /// the dead scene (no HUD, stale subscribers), and
+        /// PlayerSelectionManager's per-level override -- scoped to a level by
+        /// definition -- would silently follow the player into the next map.
+        /// (The death effect's color needs no special handling anymore: it
+        /// draws with Hair.Color, which is exactly what Kirby's shoes show.)
         /// </summary>
-        private static global::Celeste.PlayerDeadBody OnPlayerDie(On.Celeste.Player.orig_Die orig, global::Celeste.Player self, Vector2 direction, bool evenIfInvincible, bool registerDeathInStats)
+        private static void OnLevelExit(Level level, LevelExit exit, LevelExit.Mode mode, Session session, HiresSnow snow)
         {
-            var kpc = self.Get<KirbyPlayerController>();
-            if (kpc == null)
-                return orig(self, direction, evenIfInvincible, registerDeathInStats);
-
-            Color originalHairColor = self.Hair.Color;
-            self.Hair.Color = KirbyDashColors.GetColor(self.Dashes, (self.Scene as Level)?.TimeActive ?? 0f);
-            global::Celeste.PlayerDeadBody result = orig(self, direction, evenIfInvincible, registerDeathInStats);
-            self.Hair.Color = originalHairColor;
-            return result;
+            K_PlayerHealthManager.ResetStatics();
+            PlayerSelectionManager.ClearLevelOverride();
         }
 
         /// <summary>
@@ -217,8 +219,6 @@ namespace Celeste.Mod.KirbyHelperMechanics
             {
                 if (kpc.CheckInhaleEntry())
                     return kpc.StKirbyInhale;
-                if (kpc.CheckDoubleJumpEntry())
-                    return global::Celeste.Player.StNormal;
                 if (kpc.CheckFloatEntry())
                     return kpc.StKirbyFloat;
             }
@@ -242,8 +242,6 @@ namespace Celeste.Mod.KirbyHelperMechanics
             var kpc = self.Get<KirbyPlayerController>();
             if (kpc != null)
             {
-                if (kpc.CheckDoubleJumpEntry())
-                    return global::Celeste.Player.StNormal;
                 if (kpc.CheckFloatEntry())
                     return kpc.StKirbyFloat;
             }
