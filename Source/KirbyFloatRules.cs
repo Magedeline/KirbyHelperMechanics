@@ -10,7 +10,7 @@ namespace Celeste.Mod.KirbyHelperMechanics
     /// </summary>
     internal static class KirbyFloatRules
     {
-        public const float DefaultMaxDuration = 1.5f;
+        public static float DefaultMaxDuration => KirbyTuning.Current.KirbyFloatMaxDuration;
 
         private const string OverrideFlag = "KirbyHelperMechanics_floatOverride";
         private const string DisabledFlag = "KirbyHelperMechanics_floatDisabled";

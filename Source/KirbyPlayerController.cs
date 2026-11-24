@@ -165,16 +165,16 @@ namespace Celeste.Entities
 
         #region Kirby Float (hover) -- ported from legacy K_Player.KirbyFloatBegin/Update/End
 
-        private const float KirbyFloatSpeed = -35f;
+        private static float KirbyFloatSpeed => KirbyTuning.Current.KirbyFloatSpeed;
         // A true 0-sink hover (briefly shipped) let Kirby camp motionless
         // indefinitely -- this is a compromise: still a much gentler sink than
         // the original 18f, but no longer a perfect stall.
-        private const float KirbyFloatFallSpeed = 7f;
-        private const float KirbyFloatGravity = 45f;
-        private const float KirbyFloatHSpeed = 80f;
-        private const float KirbyFloatHAccel = 550f; // legacy: RunAccel(1000f) * .55f
+        private static float KirbyFloatFallSpeed => KirbyTuning.Current.KirbyFloatFallSpeed;
+        private static float KirbyFloatGravity => KirbyTuning.Current.KirbyFloatGravity;
+        private static float KirbyFloatHSpeed => KirbyTuning.Current.KirbyFloatHSpeed;
+        private static float KirbyFloatHAccel => KirbyTuning.Current.KirbyFloatHAccel; // legacy: RunAccel(1000f) * .55f
         private const float KirbyFlapScaleTime = 0.12f;
-        private const float KirbyAirPuffSpeed = 120f;
+        private static float KirbyAirPuffSpeed => KirbyTuning.Current.KirbyAirPuffSpeed;
 
         // Total float time per AIRTIME, independent of flap charges -- a
         // budget shared by every Float session between two landings, refilled
@@ -183,13 +183,13 @@ namespace Celeste.Entities
         // with a dash or a higher KirbyMaxFloatJumps) chained 4.5s+ of hover
         // and carried Kirby ~440px, well over a screen, from a single jump.
         // Default only -- K_KirbyFloatTrigger can change it per area (see KirbyFloatRules).
-        private const float KirbyFloatMaxDuration = KirbyFloatRules.DefaultMaxDuration;
+        private static float KirbyFloatMaxDuration => KirbyFloatRules.DefaultMaxDuration;
 
         // Cap on the progressive flap cost in KirbyFloatBegin (see
         // kirbyFloatEntriesThisAirtime) -- without a cap, a large
         // KirbyMaxFloatJumps setting would make each successive re-entry cost
         // more and more indefinitely.
-        private const int KirbyFloatMaxEntryCost = 3;
+        private static int KirbyFloatMaxEntryCost => KirbyTuning.Current.KirbyFloatMaxEntryCost;
 
         // Matches vanilla's own jump buffer (Input.Jump's 0.08s): how far
         // ahead of a landing a jump press is left for vanilla to buffer
@@ -532,21 +532,21 @@ namespace Celeste.Entities
         // holding down still counts as a wave dash. Short enough to require the
         // vanilla-style duck-cancel timing, long enough to be forgiving of a
         // few frames of falling.
-        private const float KirbyWaveDashWindowTime = 0.15f;
+        private static float KirbyWaveDashWindowTime => KirbyTuning.Current.KirbyWaveDashWindowTime;
 
         // Extra horizontal speed granted per chained wave dash, before the cap.
-        private const float KirbyWaveDashSpeedPerChain = 45f;
+        private static float KirbyWaveDashSpeedPerChain => KirbyTuning.Current.KirbyWaveDashSpeedPerChain;
 
         // Hard cap on the total wave dash speed bonus -- without this, chaining
         // wave dashes across a long room could accelerate Kirby indefinitely.
-        private const float KirbyWaveDashMaxBonusSpeed = 220f;
+        private static float KirbyWaveDashMaxBonusSpeed => KirbyTuning.Current.KirbyWaveDashMaxBonusSpeed;
 
         // Consecutive wave dashes are chained by chasing them back-to-back;
         // spending this long on the ground without landing another one resets
         // the chain back to zero.
-        private const float KirbyWaveDashChainResetTime = 0.5f;
+        private static float KirbyWaveDashChainResetTime => KirbyTuning.Current.KirbyWaveDashChainResetTime;
 
-        private const int KirbyWaveDashMaxChain = 5;
+        private static int KirbyWaveDashMaxChain => KirbyTuning.Current.KirbyWaveDashMaxChain;
 
         private float kirbyWaveDashArmTimer;
         private int kirbyWaveDashDashDirX;
@@ -556,7 +556,7 @@ namespace Celeste.Entities
         // How long after a successful wave-dash landing the bonus stays
         // available to the super jump out of it (the rest of the dash, plus
         // vanilla's coyote time).
-        private const float KirbyWaveDashJumpWindowTime = 0.25f;
+        private static float KirbyWaveDashJumpWindowTime => KirbyTuning.Current.KirbyWaveDashJumpWindowTime;
         private float kirbyWaveDashPendingBonus;
         private float kirbyWaveDashPendingTimer;
 
@@ -663,16 +663,16 @@ namespace Celeste.Entities
 
         #region Kirby Inhale -- ported from legacy K_Player.KirbyInhaleBegin/Update/End/Coroutine
 
-        private const float KirbyInhaleRange = 80f;
-        private const float KirbyInhalePullSpeed = 200f;
-        private const float KirbyInhaleTime = 1.5f;
+        private static float KirbyInhaleRange => KirbyTuning.Current.KirbyInhaleRange;
+        private static float KirbyInhalePullSpeed => KirbyTuning.Current.KirbyInhalePullSpeed;
+        private static float KirbyInhaleTime => KirbyTuning.Current.KirbyInhaleTime;
         // Pull strength at max range used to taper all the way to zero (dist ==
         // KirbyInhaleRange -> 0 pull), so a target caught right at the edge of
         // range barely moved at first and often couldn't close the gap before
         // KirbyInhaleTime ran out -- the practical usable range was much smaller
         // than KirbyInhaleRange implied. This floors the falloff instead of
         // letting it hit zero.
-        private const float KirbyInhaleMinPullFraction = 0.4f;
+        private static float KirbyInhaleMinPullFraction => KirbyTuning.Current.KirbyInhaleMinPullFraction;
         private const int KirbyInhaleTendrilCount = 5;
 
         private float kirbyInhaleTimer;
@@ -800,9 +800,9 @@ namespace Celeste.Entities
         // that is about to touch Kirby comes first; otherwise the one best lined
         // up with where the stick points. The top target gets the full pull and
         // the rest a reduced one, so the one the player meant is swallowed first.
-        private const float KirbyInhaleThreatRadius = 24f;
-        private const float KirbyInhaleSecondaryPull = 0.6f;
-        private const float KirbyInhaleAimTilt = 0.6f;
+        private static float KirbyInhaleThreatRadius => KirbyTuning.Current.KirbyInhaleThreatRadius;
+        private static float KirbyInhaleSecondaryPull => KirbyTuning.Current.KirbyInhaleSecondaryPull;
+        private static float KirbyInhaleAimTilt => KirbyTuning.Current.KirbyInhaleAimTilt;
 
         private readonly List<(Entity entity, InhaleableComponent inhaleable, float dist, float score)> inhaleCandidates = new();
 
@@ -948,7 +948,7 @@ namespace Celeste.Entities
             return method;
         }
 
-        private const float KirbyHitStreakWindow = 3f;
+        private static float KirbyHitStreakWindow => KirbyTuning.Current.KirbyHitStreakWindow;
         private int kirbyHitStreak;
         private float kirbyLastHitTime = float.MinValue;
 
@@ -988,14 +988,14 @@ namespace Celeste.Entities
         // refill-crystal freeze after players reported it swallowing inputs.
         // Input buffers (0.08s) outlast these, so a press made during the
         // freeze still goes through.
-        private const float HitStopDealtBase = 0.03f;
-        private const float HitStopPerDamage = 0.01f;
-        private const float HitStopTaken = 0.04f; // scaled by knockback strength in OnDamaged
-        private const float HitStopMax = 0.06f;
+        private static float HitStopDealtBase => KirbyTuning.Current.HitStopDealtBase;
+        private static float HitStopPerDamage => KirbyTuning.Current.HitStopPerDamage;
+        private static float HitStopTaken => KirbyTuning.Current.HitStopTaken; // scaled by knockback strength in OnDamaged
+        private static float HitStopMax => KirbyTuning.Current.HitStopMax;
 
         // The victim keeps shaking a few frames past the freeze so the shake
         // reads even on the shortest (0.04s) stops.
-        private const float HitShakeExtra = 0.05f;
+        private static float HitShakeExtra => KirbyTuning.Current.HitShakeExtra;
 
         /// <summary>
         /// Freezes the game for <paramref name="time"/> seconds and shakes
@@ -1027,9 +1027,9 @@ namespace Celeste.Entities
 
         #region Kirby Star Spit -- ported from legacy K_Player.KirbyStarSpitBegin/Update/End/Coroutine
 
-        private const float KirbyStarSpitSpeed = 300f;
-        private const int KirbyStarSpitDamage = 2;
-        private const float ThrowRecoil = 80f;
+        private static float KirbyStarSpitSpeed => KirbyTuning.Current.KirbyStarSpitSpeed;
+        private static int KirbyStarSpitDamage => KirbyTuning.Current.KirbyStarSpitDamage;
+        private static float ThrowRecoil => KirbyTuning.Current.ThrowRecoil;
 
         private Vector2 kirbyStarSpitDir;
 
@@ -1179,15 +1179,15 @@ namespace Celeste.Entities
         // K_PlayerHealthManager.TryDamagePlayer): a short hop away from the
         // source, so Kirby is actually separated from whatever hurt him instead
         // of sitting inside it until the i-frames run out.
-        private const float KirbyHurtKnockbackX = 120f;
-        private const float KirbyHurtKnockbackY = -90f;
+        private static float KirbyHurtKnockbackX => KirbyTuning.Current.KirbyHurtKnockbackX;
+        private static float KirbyHurtKnockbackY => KirbyTuning.Current.KirbyHurtKnockbackY;
         // Knockback grows with the hit (Sakurai: the reaction should match the
         // hit's strength; Dream Land's design doc sent Kirby further at low
         // health). Each damage point past the first adds 25%, and the share of
         // HP already missing adds up to 50%, capped at 1.75x the base hop.
-        private const float KnockbackPerExtraDamage = 0.25f;
-        private const float KnockbackPerMissingHP = 0.5f;
-        private const float KnockbackMaxScale = 1.75f;
+        private static float KnockbackPerExtraDamage => KirbyTuning.Current.KnockbackPerExtraDamage;
+        private static float KnockbackPerMissingHP => KirbyTuning.Current.KnockbackPerMissingHP;
+        private static float KnockbackMaxScale => KirbyTuning.Current.KnockbackMaxScale;
         // How long the kirby_damage animation overrides the vanilla-id mirroring
         // in SyncKirbySpriteFromVanilla (the clip itself is 2 frames @ 0.08s).
         private const float KirbyHurtAnimTime = 0.2f;

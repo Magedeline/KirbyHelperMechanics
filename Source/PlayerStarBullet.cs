@@ -24,7 +24,7 @@ namespace Celeste.Projectiles
         // should have hit, it hits). Walls use the real circle; enemies are
         // tested against one a few pixels bigger, so a star that visibly grazes
         // an enemy counts.
-        private const float EnemyHitPadding = 4f;
+        private static float EnemyHitPadding => global::Celeste.Mod.KirbyHelperMechanics.KirbyTuning.Current.StarEnemyHitPadding;
         private readonly Collider wallCollider;
         private readonly Collider enemyCollider;
 

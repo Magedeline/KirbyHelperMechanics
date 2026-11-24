@@ -18,7 +18,7 @@ namespace Celeste.Mod.KirbyHelperMechanics
     /// </summary>
     internal static class KirbyHitShake
     {
-        private const float Amplitude = 2f; // pixels at the start of the shake
+        private static float Amplitude => KirbyTuning.Current.HitShakeAmplitude; // pixels at the start of the shake
 
         private sealed class Shake
         {

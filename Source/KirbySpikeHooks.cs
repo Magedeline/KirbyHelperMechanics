@@ -64,7 +64,7 @@ namespace Celeste.Mod.KirbyHelperMechanics
             // Put the "source" on the spike side of Kirby so the knockback pushes him
             // out along the spikes' facing (up off floor spikes, away from wall spikes).
             Vector2 source = self.Center - SpikeOutward(spikes.Direction) * 8f;
-            K_PlayerHealthManager.TryDamagePlayer(1, source);
+            K_PlayerHealthManager.TryDamagePlayer(KirbyTuning.Current.SpikeDamage, source);
             return null;
         }
 
