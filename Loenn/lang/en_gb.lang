@@ -14,6 +14,13 @@ triggers.KirbyHelperMechanics/K_PlayerHealthTrigger.attributes.description.fullH
 triggers.KirbyHelperMechanics/K_PlayerHealthTrigger.attributes.description.setRespawnPoint=Set the respawn point to where the player entered the trigger
 triggers.KirbyHelperMechanics/K_PlayerHealthTrigger.attributes.description.onlyOnce=Only fire the first time the trigger is entered
 
+# Kirby Float Trigger
+triggers.KirbyHelperMechanics/K_KirbyFloatTrigger.placements.name.k_kirby_float_trigger=Kirby Float Rules Trigger
+triggers.KirbyHelperMechanics/K_KirbyFloatTrigger.attributes.description.floatEnabled=Allow Kirby to float after entering (uncheck to turn Float off)
+triggers.KirbyHelperMechanics/K_KirbyFloatTrigger.attributes.description.maxDuration=Seconds of float Kirby gets per jump, refilled on landing (default 1.5)
+triggers.KirbyHelperMechanics/K_KirbyFloatTrigger.attributes.description.maxFlaps=Flaps per jump, refilled on landing. 0 uses the player's Mod Options setting
+triggers.KirbyHelperMechanics/K_KirbyFloatTrigger.attributes.description.resetOnLeave=Go back to the default float rules when Kirby leaves the trigger. Otherwise the rules stay until another float trigger changes them
+
 # K_Player Refill
 entities.KirbyHelperMechanics/K_PlayerRefill.placements.name.k_player_refill=K_Player Refill
 entities.KirbyHelperMechanics/K_PlayerRefill.attributes.description.oneUse=Disappear permanently after being collected once, instead of respawning

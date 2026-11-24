@@ -239,7 +239,8 @@ public class K_PlayerHealthManager : Entity
             return true;
         }
 
-        player.Get<KirbyPlayerController>()?.OnDamaged(away);
+        float missingFraction = manager.MaxHP <= 0 ? 0f : 1f - (float)manager.CurrentHP / manager.MaxHP;
+        player.Get<KirbyPlayerController>()?.OnDamaged(away, damage, missingFraction);
         return true;
     }
 

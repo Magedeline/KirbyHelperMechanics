@@ -182,7 +182,8 @@ namespace Celeste.Entities
         // entry, so dropping out and re-entering (3 entries on 5 flaps, more
         // with a dash or a higher KirbyMaxFloatJumps) chained 4.5s+ of hover
         // and carried Kirby ~440px, well over a screen, from a single jump.
-        private const float KirbyFloatMaxDuration = 1.5f;
+        // Default only -- K_KirbyFloatTrigger can change it per area (see KirbyFloatRules).
+        private const float KirbyFloatMaxDuration = KirbyFloatRules.DefaultMaxDuration;
 
         // Cap on the progressive flap cost in KirbyFloatBegin (see
         // kirbyFloatEntriesThisAirtime) -- without a cap, a large
@@ -278,9 +279,9 @@ namespace Celeste.Entities
             // the legacy K_Player's per-frame "onGround -> reset to max" behavior.
             if (player.onGround)
             {
-                kirbyFlapCount = KirbyHelperMechanicsModule.Settings?.KirbyMaxFloatJumps ?? 5;
+                kirbyFlapCount = KirbyFloatRules.MaxFlaps(level?.Session);
                 kirbyFloatEntriesThisAirtime = 0;
-                kirbyFloatDurationTimer = KirbyFloatMaxDuration;
+                kirbyFloatDurationTimer = KirbyFloatRules.MaxDuration(level?.Session);
             }
         }
 
@@ -344,6 +345,9 @@ namespace Celeste.Entities
                 return false;
             if (kirbyFlapCount <= 0)
                 return false;
+            // A K_KirbyFloatTrigger turned Float off here.
+            if (!KirbyFloatRules.Enabled(level?.Session))
+                return false;
             // This airtime's float budget is spent -- see KirbyFloatMaxDuration.
             if (kirbyFloatDurationTimer <= 0f)
                 return false;
@@ -377,7 +381,7 @@ namespace Celeste.Entities
         /// </summary>
         internal void GrantDashFlapRefill()
         {
-            int max = KirbyHelperMechanicsModule.Settings?.KirbyMaxFloatJumps ?? 5;
+            int max = KirbyFloatRules.MaxFlaps(level?.Session);
             kirbyFlapCount = Math.Min(max, kirbyFlapCount + 1);
         }
 
@@ -792,8 +796,22 @@ namespace Celeste.Entities
             player.StateMachine.State = global::Celeste.Player.StNormal;
         }
 
+        // Inhale target priority (after HAL's Forgotten Land talk): an enemy
+        // that is about to touch Kirby comes first; otherwise the one best lined
+        // up with where the stick points. The top target gets the full pull and
+        // the rest a reduced one, so the one the player meant is swallowed first.
+        private const float KirbyInhaleThreatRadius = 24f;
+        private const float KirbyInhaleSecondaryPull = 0.6f;
+        private const float KirbyInhaleAimTilt = 0.6f;
+
+        private readonly List<(Entity entity, InhaleableComponent inhaleable, float dist, float score)> inhaleCandidates = new();
+
         private void PullAndInhaleEnemies(Vector2 origin, Vector2 direction)
         {
+            // Holding down/up tilts which target is preferred (not the cone itself).
+            Vector2 aim = (direction + Vector2.UnitY * Input.MoveY.Value * KirbyInhaleAimTilt).SafeNormalize(direction);
+
+            inhaleCandidates.Clear();
             // Snapshot: RemoveSelf() below mutates Scene.Entities, which would
             // crash a live foreach over the same collection mid-enumeration.
             foreach (Entity entity in player.Scene.Entities.ToArray())
@@ -820,10 +838,24 @@ namespace Celeste.Entities
                 if (toEntity.Length() > 0 && Vector2.Dot(toEntity.SafeNormalize(), direction) < 0.3f)
                     continue;
 
+                // Threats (about to reach Kirby) always outrank everything else;
+                // among the rest, alignment with the aim and closeness decide.
+                float score = Vector2.Dot(toEntity.SafeNormalize(), aim) + (1f - dist / KirbyInhaleRange);
+                if (toEntity.Length() < KirbyInhaleThreatRadius)
+                    score += 10f;
+                inhaleCandidates.Add((entity, inhaleable, dist, score));
+            }
+
+            inhaleCandidates.Sort((a, b) => b.score.CompareTo(a.score));
+
+            for (int i = 0; i < inhaleCandidates.Count; i++)
+            {
+                var (entity, inhaleable, dist, _) = inhaleCandidates[i];
+
                 // pull it toward the mouth
                 Vector2 pullDir = (player.Center - entity.Center).SafeNormalize();
                 float pullFraction = 1f - (1f - KirbyInhaleMinPullFraction) * (dist / KirbyInhaleRange);
-                float pullStrength = KirbyInhalePullSpeed * pullFraction;
+                float pullStrength = KirbyInhalePullSpeed * pullFraction * (i == 0 ? 1f : KirbyInhaleSecondaryPull);
 
                 if (entity is Actor actor)
                 {
@@ -926,7 +958,7 @@ namespace Celeste.Entities
                 && GetTakeDamageMethod(entity.GetType()) != null;
         }
 
-        private void ApplyCombatDamage(Entity target, int damage, Vector2 knockbackDir)
+        private void ApplyCombatDamage(Entity target, int damage, Vector2 knockbackDir, float streakTime = -1f)
         {
             var method = GetTakeDamageMethod(target.GetType());
             if (method == null)
@@ -937,8 +969,11 @@ namespace Celeste.Entities
             // Hit streak: consecutive hits landed within KirbyHitStreakWindow of
             // each other. Display only -- it doesn't change the damage dealt.
             float now = level?.TimeActive ?? 0f;
-            kirbyHitStreak = now - kirbyLastHitTime <= KirbyHitStreakWindow ? kirbyHitStreak + 1 : 1;
-            kirbyLastHitTime = now;
+            float countedAt = streakTime >= 0f ? Math.Min(streakTime, now) : now;
+            kirbyHitStreak = countedAt - kirbyLastHitTime <= KirbyHitStreakWindow ? kirbyHitStreak + 1 : 1;
+            // Never move the streak clock backwards (an older star landing after
+            // a newer hit must not shorten the window for the next one).
+            kirbyLastHitTime = Math.Max(kirbyLastHitTime, countedAt);
             level?.Add(new KirbyDamageNumber(target.Center, damage, kirbyHitStreak));
 
             level?.Displacement.AddBurst(target.Center, .2f, 4, 24, .2f, Ease.QuadOut, Ease.QuadOut);
@@ -955,7 +990,7 @@ namespace Celeste.Entities
         // freeze still goes through.
         private const float HitStopDealtBase = 0.03f;
         private const float HitStopPerDamage = 0.01f;
-        private const float HitStopTaken = 0.06f;
+        private const float HitStopTaken = 0.04f; // scaled by knockback strength in OnDamaged
         private const float HitStopMax = 0.06f;
 
         // The victim keeps shaking a few frames past the freeze so the shake
@@ -981,8 +1016,12 @@ namespace Celeste.Entities
         public bool IsValidTarget(Entity entity) => IsDamageableTarget(entity);
 
         /// <summary>Public wrapper so <see cref="PlayerStarBullet"/> can reuse the same damage checks.</summary>
-        public void DealProjectileDamage(Entity target, int damage, Vector2 knockbackDir)
-            => ApplyCombatDamage(target, damage, knockbackDir);
+        /// <param name="streakTime">
+        /// Level time the hit counts at for the hit streak -- the star passes the
+        /// moment it was spat, so travel time doesn't break a combo.
+        /// </param>
+        public void DealProjectileDamage(Entity target, int damage, Vector2 knockbackDir, float streakTime = -1f)
+            => ApplyCombatDamage(target, damage, knockbackDir, streakTime);
 
         #endregion
 
@@ -1142,6 +1181,13 @@ namespace Celeste.Entities
         // of sitting inside it until the i-frames run out.
         private const float KirbyHurtKnockbackX = 120f;
         private const float KirbyHurtKnockbackY = -90f;
+        // Knockback grows with the hit (Sakurai: the reaction should match the
+        // hit's strength; Dream Land's design doc sent Kirby further at low
+        // health). Each damage point past the first adds 25%, and the share of
+        // HP already missing adds up to 50%, capped at 1.75x the base hop.
+        private const float KnockbackPerExtraDamage = 0.25f;
+        private const float KnockbackPerMissingHP = 0.5f;
+        private const float KnockbackMaxScale = 1.75f;
         // How long the kirby_damage animation overrides the vanilla-id mirroring
         // in SyncKirbySpriteFromVanilla (the clip itself is 2 frames @ 0.08s).
         private const float KirbyHurtAnimTime = 0.2f;
@@ -1154,7 +1200,9 @@ namespace Celeste.Entities
         /// actually deducted; the post-hit blink itself is driven by the
         /// manager's invulnerability timer (see <see cref="RenderKirbyOverlay"/>).
         /// </summary>
-        internal void OnDamaged(Vector2 awayFromSource)
+        /// <param name="damage">HP this hit took.</param>
+        /// <param name="missingFraction">Share of max HP missing after the hit (0..1).</param>
+        internal void OnDamaged(Vector2 awayFromSource, int damage = 1, float missingFraction = 0f)
         {
             // A hit always knocks Kirby out of his own ability states -- Float
             // in particular keeps re-asserting Speed.Y every frame and would
@@ -1166,7 +1214,10 @@ namespace Celeste.Entities
             if (dirX == 0)
                 dirX = -(int)player.Facing;
 
-            player.Speed = new Vector2(dirX * KirbyHurtKnockbackX, KirbyHurtKnockbackY);
+            float strength = Math.Min(KnockbackMaxScale,
+                1f + KnockbackPerExtraDamage * Math.Max(0, damage - 1)
+                   + KnockbackPerMissingHP * Calc.Clamp(missingFraction, 0f, 1f));
+            player.Speed = new Vector2(dirX * KirbyHurtKnockbackX, KirbyHurtKnockbackY) * strength;
             player.varJumpTimer = 0f;
 
             kirbyHurtAnimTimer = KirbyHurtAnimTime;
@@ -1174,8 +1225,9 @@ namespace Celeste.Entities
 
             Audio.Play("event:/game/general/thing_booped", player.Position);
             Input.Rumble(RumbleStrength.Medium, RumbleLength.Short);
-            level?.Shake(0.2f);
-            KirbyHitStop(HitStopTaken, player);
+            level?.Shake(0.2f * strength);
+            // Harder hits freeze a touch longer too: 0.04s up to the 0.06s cap.
+            KirbyHitStop(Math.Min(HitStopMax, HitStopTaken * strength), player);
         }
 
         #endregion
