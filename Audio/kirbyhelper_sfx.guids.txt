@@ -132,3 +132,4 @@
 {2008ebd9-a254-4150-8113-1597297a86e6} bus:/music/tunes/mains/Celestellaris_gameplay_sfx/char/kirby/knight
 {8e41e616-9d1c-4e63-91ac-5c883adbd1e7} bus:/music/tunes/mains/Celestellaris_gameplay_sfx/game/general/yes_pause
 {56cf0b9e-80d1-4f71-80ec-f32f20a855c2} bank:/kirbyhelper_sfx
+{f8878177-893a-47e9-81e8-391e5b628be8} event:/char/dialogue/Celestellaris/kirby
