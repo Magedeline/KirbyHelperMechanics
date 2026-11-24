@@ -47,6 +47,11 @@ foreach ($item in $includePaths) {
     Copy-Item -Path $src -Destination (Join-Path $stageDir $item) -Recurse
 }
 
+# FMOD Studio drops its own "Master Bank*.bank" next to the mod's bank when it
+# builds. Those belong to the FMOD project, not the mod: never ship them.
+Get-ChildItem -Path (Join-Path $stageDir "Audio") -Filter "Master Bank*" -ErrorAction SilentlyContinue |
+    Remove-Item -Force
+
 Write-Host "Zipping to $zipPath..."
 if (Test-Path $zipPath) {
     Remove-Item $zipPath -Force
