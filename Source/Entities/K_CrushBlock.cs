@@ -65,7 +65,8 @@ namespace Celeste.Entities
                 ? player.Center.X - Center.X
                 : player.Center.Y - Center.Y;
 
-            if (alongAxisDist < Height && Math.Abs(towardOffset) < ActivationRange)
+            float band = axis == ChargeAxis.Horizontal ? Height : Width;
+            if (alongAxisDist < band && Math.Abs(towardOffset) < ActivationRange)
                 Add(new Coroutine(ChargeRoutine(Math.Sign(towardOffset))));
         }
 
@@ -83,7 +84,13 @@ namespace Celeste.Entities
                     ? MoveHCollideSolids(ChargeSpeed * direction * Engine.DeltaTime, false)
                     : MoveVCollideSolids(ChargeSpeed * direction * Engine.DeltaTime, false);
 
-                DamageOverlappingPlayer();
+                DamageOverlappingPlayer(direction);
+                // Nothing in the way: stop at the room edge instead of
+                // charging off into the void forever.
+                if (!hit && Scene is Level room
+                    && (Right < room.Bounds.Left || Left > room.Bounds.Right
+                        || Bottom < room.Bounds.Top || Top > room.Bounds.Bottom))
+                    hit = true;
                 yield return null;
             }
 
@@ -96,10 +103,19 @@ namespace Celeste.Entities
             busy = false;
         }
 
-        private void DamageOverlappingPlayer()
+        private void DamageOverlappingPlayer(int direction)
         {
             global::Celeste.Player player = Scene.Tracker.GetEntity<global::Celeste.Player>();
-            if (player == null || !CollideCheck(player))
+            if (player == null)
+                return;
+
+            // The block is a Solid and shoves the player ahead of it rather
+            // than ever overlapping them, so "hit" means the player is flush
+            // against the leading face.
+            Rectangle face = axis == ChargeAxis.Horizontal
+                ? new Rectangle(direction > 0 ? (int)Right : (int)Left - 2, (int)Top, 2, (int)Height)
+                : new Rectangle((int)Left, direction > 0 ? (int)Bottom : (int)Top - 2, (int)Width, 2);
+            if (!player.CollideRect(face))
                 return;
 
             if (player.Get<KirbyPlayerController>() != null)

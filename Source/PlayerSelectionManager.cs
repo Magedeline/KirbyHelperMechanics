@@ -95,8 +95,14 @@ public class PlayerSelectionManager : Entity
     /// </summary>
     public static PlayerType GetSelectedPlayer()
     {
+        // The manager is added at end of frame, so the very first Player of
+        // a game session asks before it exists -- answer from the setting
+        // rather than assuming Kirby, or "Kirby Player Enabled: off" is
+        // ignored for that first spawn.
         if (Instance == null)
-            return PlayerType.Kirby; // Fallback default
+            return (KirbyHelperMechanicsModule.Settings?.KirbyPlayerEnabled ?? true)
+                ? PlayerType.Kirby
+                : PlayerType.Madeline;
         
         return Instance.levelOverride ?? Instance.currentPlayerType;
     }

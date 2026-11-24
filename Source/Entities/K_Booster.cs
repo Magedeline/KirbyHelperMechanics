@@ -48,11 +48,30 @@ namespace Celeste.Entities
             used = true;
             Collidable = false;
 
+            // StDummy still applies gravity unless told otherwise, which let
+            // the player sink ~28px out of the booster during the hold.
             player.StateMachine.State = global::Celeste.Player.StDummy;
+            player.DummyGravity = false;
             player.Speed = Vector2.Zero;
+            player.Position += Position - player.Center;
             Audio.Play(isRed ? "event:/Celestellaris/game/07_inferno/redbooster_enter" : "event:/Celestellaris/game/06_stronghold/greenbooster_enter", Position);
 
-            yield return HoldTime;
+            for (float t = 0f; t < HoldTime; t += Engine.DeltaTime)
+            {
+                if (player.Scene == null || player.Dead)
+                    break;
+                player.Speed = Vector2.Zero;
+                yield return null;
+            }
+
+            player.DummyGravity = true;
+            if (player.Scene == null || player.Dead)
+            {
+                yield return Cooldown;
+                used = false;
+                Collidable = true;
+                yield break;
+            }
 
             Vector2 dir = player.lastAim;
             if (dir == Vector2.Zero)

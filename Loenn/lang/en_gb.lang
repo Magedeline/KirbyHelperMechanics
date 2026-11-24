@@ -5,6 +5,15 @@ triggers.KirbyHelperMechanics/K_PlayerTrigger.attributes.description.flag=Sessio
 triggers.KirbyHelperMechanics/K_PlayerTrigger.attributes.description.clearFlagOnLeave=Set the flag back to false when K_Player leaves the trigger area
 triggers.KirbyHelperMechanics/K_PlayerTrigger.attributes.description.onlyOnce=Only fire the enter/leave events and flag once, then stay dormant
 
+# K_Player Health Trigger
+triggers.KirbyHelperMechanics/K_PlayerHealthTrigger.placements.name.k_player_health_trigger=K_Player Health Trigger
+triggers.KirbyHelperMechanics/K_PlayerHealthTrigger.attributes.description.enableHealth=Turn K_Player's health system on (checked) or off (unchecked) when entered
+triggers.KirbyHelperMechanics/K_PlayerHealthTrigger.attributes.description.maxHealth=Maximum health to set when enabling. Enabling also refills health to this value
+triggers.KirbyHelperMechanics/K_PlayerHealthTrigger.attributes.description.healAmount=Health to restore on entry (ignored if fullHeal is checked)
+triggers.KirbyHelperMechanics/K_PlayerHealthTrigger.attributes.description.fullHeal=Restore all health on entry
+triggers.KirbyHelperMechanics/K_PlayerHealthTrigger.attributes.description.setRespawnPoint=Set the respawn point to where the player entered the trigger
+triggers.KirbyHelperMechanics/K_PlayerHealthTrigger.attributes.description.onlyOnce=Only fire the first time the trigger is entered
+
 # K_Player Refill
 entities.KirbyHelperMechanics/K_PlayerRefill.placements.name.k_player_refill=K_Player Refill
 entities.KirbyHelperMechanics/K_PlayerRefill.attributes.description.oneUse=Disappear permanently after being collected once, instead of respawning

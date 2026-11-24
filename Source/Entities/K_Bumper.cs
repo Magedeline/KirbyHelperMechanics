@@ -54,19 +54,25 @@ namespace Celeste.Entities
                 player.StateMachine.State = global::Celeste.Player.StNormal;
 
             Vector2 dir = (player.Center - Center).SafeNormalize(-Vector2.UnitY);
-            player.Speed = dir * LaunchSpeed;
-            player.varJumpTimer = 0f;
 
-            Audio.Play("event:/Celestellaris/game/08_edge/pinballbumper_hit", Position);
-            Input.Rumble(RumbleStrength.Strong, RumbleLength.Medium);
-
+            // Damage before the launch: the hit reaction sets its own (much
+            // weaker) knockback, which used to replace the bumper's launch.
             if (hot)
             {
                 if (player.Get<KirbyPlayerController>() != null)
                     K_PlayerHealthManager.TryDamagePlayer(TouchDamage, Center);
                 else
                     player.Die(-dir);
+
+                if (player.Dead)
+                    return;
             }
+
+            player.Speed = dir * LaunchSpeed;
+            player.varJumpTimer = 0f;
+
+            Audio.Play("event:/Celestellaris/game/08_edge/pinballbumper_hit", Position);
+            Input.Rumble(RumbleStrength.Strong, RumbleLength.Medium);
         }
 
         public override void Render()

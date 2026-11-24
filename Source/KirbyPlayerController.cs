@@ -111,9 +111,15 @@ namespace Celeste.Entities
             _hooksLoaded = false;
         }
 
-        public KirbyPlayerController()
+        // True when attached to a brand-new Player (level entry, respawn) --
+        // that starts at full HP. A mid-level swap back to Kirby keeps
+        // whatever HP was left, so toggling characters isn't a free heal.
+        private readonly bool healOnAttach;
+
+        public KirbyPlayerController(bool healOnAttach = true)
             : base(active: true, visible: true)
         {
+            this.healOnAttach = healOnAttach;
         }
 
         public override void Added(Entity entity)
@@ -170,11 +176,12 @@ namespace Celeste.Entities
         private const float KirbyFlapScaleTime = 0.12f;
         private const float KirbyAirPuffSpeed = 120f;
 
-        // Total hold-time cap for a single float session, independent of flap
-        // charges. Shortened from an earlier 2.5f alongside the FallSpeed nerf
-        // above -- together they keep even a maxed-flap hover from being able
-        // to camp in place for long. Resets to full every time float is
-        // (re-)entered from grounded.
+        // Total float time per AIRTIME, independent of flap charges -- a
+        // budget shared by every Float session between two landings, refilled
+        // only while grounded (PreUpdate). It used to refill on every Float
+        // entry, so dropping out and re-entering (3 entries on 5 flaps, more
+        // with a dash or a higher KirbyMaxFloatJumps) chained 4.5s+ of hover
+        // and carried Kirby ~440px, well over a screen, from a single jump.
         private const float KirbyFloatMaxDuration = 1.5f;
 
         // Cap on the progressive flap cost in KirbyFloatBegin (see
@@ -183,9 +190,14 @@ namespace Celeste.Entities
         // more and more indefinitely.
         private const int KirbyFloatMaxEntryCost = 3;
 
+        // Matches vanilla's own jump buffer (Input.Jump's 0.08s): how far
+        // ahead of a landing a jump press is left for vanilla to buffer
+        // rather than taken as a Float. See CheckFloatEntry.
+        private const float KirbyLandingBufferTime = 0.08f;
+
         private int kirbyFlapCount;
         private float kirbyFlapScaleTimer;
-        private float kirbyFloatDurationTimer;
+        private float kirbyFloatDurationTimer = KirbyFloatMaxDuration;
 
         // Counts Float (re-)entries since the last time Kirby touched ground --
         // KirbyFloatBegin scales its flap cost off this, so chaining
@@ -268,6 +280,7 @@ namespace Celeste.Entities
             {
                 kirbyFlapCount = KirbyHelperMechanicsModule.Settings?.KirbyMaxFloatJumps ?? 5;
                 kirbyFloatEntriesThisAirtime = 0;
+                kirbyFloatDurationTimer = KirbyFloatMaxDuration;
             }
         }
 
@@ -331,6 +344,18 @@ namespace Celeste.Entities
                 return false;
             if (kirbyFlapCount <= 0)
                 return false;
+            // This airtime's float budget is spent -- see KirbyFloatMaxDuration.
+            if (kirbyFloatDurationTimer <= 0f)
+                return false;
+            // About to land: a jump pressed in the last few frames of a fall
+            // (or of a downward dash, i.e. an early hyper/wavedash press) is
+            // "fresh" by the rising-edge test above, but it is the press
+            // vanilla's jump buffer exists for -- leave it buffered so it
+            // becomes a real jump on landing instead of a Float a few pixels
+            // off the floor. Only matters when Float shares the Jump button.
+            if (!FloatButtonBound && player.Speed.Y >= 0f
+                && player.OnGround((int)Math.Ceiling(player.Speed.Y * KirbyLandingBufferTime) + 2))
+                return false;
             // Just bounced off a spring/enemy/pad -- see KirbyJustBounced.
             // Stealing this float-button press fights the bounce combo, so let
             // vanilla's own bounce-jump handling (or a plain jump) win instead.
@@ -366,7 +391,8 @@ namespace Celeste.Entities
             kirbyFloatEntriesThisAirtime = Math.Min(kirbyFloatEntriesThisAirtime + 1, KirbyFloatMaxEntryCost);
             kirbyFlapCount = Math.Max(0, kirbyFlapCount - kirbyFloatEntriesThisAirtime);
             kirbyFlapScaleTimer = KirbyFlapScaleTime;
-            kirbyFloatDurationTimer = KirbyFloatMaxDuration;
+            // kirbyFloatDurationTimer is deliberately NOT reset here: it is a
+            // per-airtime budget, refilled on the ground only.
 
             // Initial upward kick -- preserves stronger upward momentum so a
             // jump/bounce carries into the float instead of being clipped;
@@ -417,10 +443,10 @@ namespace Celeste.Entities
             float floatGravity = player.Speed.Y < KirbyFloatSpeed ? global::Celeste.Player.Gravity : KirbyFloatGravity;
             player.Speed.Y = Calc.Approach(player.Speed.Y, KirbyFloatFallSpeed, floatGravity * Engine.DeltaTime);
 
-            // Hold-time cap: forces an exit back to normal falling once expired,
-            // regardless of remaining flaps or held input -- landing or dashing
-            // from there on is just the normal next move, same as every other
-            // float exit below.
+            // Hold-time budget: forces an exit back to normal falling once this
+            // airtime's float time is used up, regardless of remaining flaps
+            // or held input -- and CheckFloatEntry refuses re-entry until
+            // Kirby has touched ground again.
             kirbyFloatDurationTimer -= Engine.DeltaTime;
             if (kirbyFloatDurationTimer <= 0f)
                 return global::Celeste.Player.StNormal;
@@ -523,6 +549,13 @@ namespace Celeste.Entities
         private int kirbyWaveDashChain;
         private float kirbyWaveDashChainTimer;
 
+        // How long after a successful wave-dash landing the bonus stays
+        // available to the super jump out of it (the rest of the dash, plus
+        // vanilla's coyote time).
+        private const float KirbyWaveDashJumpWindowTime = 0.25f;
+        private float kirbyWaveDashPendingBonus;
+        private float kirbyWaveDashPendingTimer;
+
         /// <summary>
         /// Called from KirbyPlayerHooks' On.Celeste.Player.StartDash hook, after
         /// GrantDashFlapRefill -- arms the wave dash window whenever the dash
@@ -563,12 +596,36 @@ namespace Celeste.Entities
                 }
             }
 
-            if (kirbyWaveDashChain > 0)
+            if (kirbyWaveDashPendingTimer > 0f)
+                kirbyWaveDashPendingTimer -= Engine.DeltaTime;
+
+            // Only time spent on the ground counts against the chain (see
+            // KirbyWaveDashChainResetTime) -- ticking in the air too reset it
+            // during every hyper's own airtime, so it could never pass 1.
+            if (kirbyWaveDashChain > 0 && player.onGround)
             {
                 kirbyWaveDashChainTimer -= Engine.DeltaTime;
                 if (kirbyWaveDashChainTimer <= 0f)
                     kirbyWaveDashChain = 0;
             }
+        }
+
+        /// <summary>
+        /// Called from KirbyPlayerHooks' On.Celeste.Player.SuperJump hook, after
+        /// orig. The jump out of a wave dash is a vanilla SuperJump, which
+        /// *sets* Speed.X (260, x1.25 ducking) rather than adding to it -- so
+        /// the bonus TriggerKirbyWaveDash put on Speed.X at landing was always
+        /// thrown away right there (and, with no jump, by the dash ending:
+        /// vanilla resets Speed to DashDir * 160). Re-applying it on top of the
+        /// super jump's own speed is what makes the buff actually exist.
+        /// </summary>
+        internal void ApplyKirbyWaveDashToSuperJump()
+        {
+            if (kirbyWaveDashPendingTimer <= 0f || player.Speed.X == 0f)
+                return;
+
+            player.Speed.X += Math.Sign(player.Speed.X) * kirbyWaveDashPendingBonus;
+            kirbyWaveDashPendingTimer = 0f;
         }
 
         private void TriggerKirbyWaveDash()
@@ -589,6 +646,10 @@ namespace Celeste.Entities
                 ? Math.Abs(player.Speed.X)
                 : 0f;
             player.Speed.X = kirbyWaveDashDashDirX * (baseSpeed + bonus);
+
+            // Held for the jump out of the slide -- see ApplyKirbyWaveDashToSuperJump.
+            kirbyWaveDashPendingBonus = bonus;
+            kirbyWaveDashPendingTimer = KirbyWaveDashJumpWindowTime;
 
             level?.Particles.Emit(global::Celeste.Player.P_DashA, 4, player.BottomCenter, Vector2.UnitX * 3f, Calc.Down);
             Input.Rumble(RumbleStrength.Light, RumbleLength.Short);
@@ -652,7 +713,16 @@ namespace Celeste.Entities
         private void KirbyInhaleBegin()
         {
             kirbyInhaleTimer = KirbyInhaleTime;
-            player.Speed = Vector2.Zero;
+            // Grounded: plant in place, as before. Airborne: only cancel any
+            // upward speed and keep whatever fall speed Kirby already has.
+            // Zeroing Speed.Y in the air made every Inhale press a free
+            // mid-air stop, and with no cooldown, tapping it repeatedly was a
+            // near-infinite hover. Horizontal speed is left to
+            // KirbyInhaleUpdate, which already brakes it at RunReduce.
+            if (player.onGround)
+                player.Speed = Vector2.Zero;
+            else
+                player.Speed.Y = Math.Max(player.Speed.Y, 0f);
 
             player.Sprite.Play("idle");
             KirbySprite?.Play(K_PlayerAnimIds.InhaleStart); // chains to InhaleLoop via its own goto
@@ -993,7 +1063,7 @@ namespace Celeste.Entities
                 return;
 
             var healthManager = K_PlayerHealthManager.GetOrCreate(level, MaxHealth);
-            healthManager?.EnableKirbyMode(MaxHealth);
+            healthManager?.EnableKirbyMode(MaxHealth, healOnAttach);
         }
 
         private void OnLeftLevel()

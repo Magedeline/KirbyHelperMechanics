@@ -35,7 +35,10 @@ namespace Celeste.Entities
 
             global::Celeste.Player player = Scene.Tracker.GetEntity<global::Celeste.Player>();
             K_KeyCarrier carrier = player?.Get<K_KeyCarrier>();
-            if (player != null && carrier != null && carrier.Has(requiredKeyId) && CollideCheck(player))
+            // Proximity, not overlap: a Solid never overlaps the player, so
+            // the door opens once a key holder is touching (or nearly) it.
+            if (player != null && carrier != null && carrier.Has(requiredKeyId)
+                && player.CollideRect(new Rectangle((int)X - 4, (int)Y - 4, (int)Width + 8, (int)Height + 8)))
             {
                 carrier.Remove(requiredKeyId);
                 Add(new Coroutine(UnlockRoutine()));

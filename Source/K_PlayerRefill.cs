@@ -125,9 +125,12 @@ namespace Celeste.Entities
                 yield break;
             }
 
-            yield return respawnTime > 0.4f ? respawnTime - 0.4f : 0f;
+            // One wait, then respawn. This used to wait here AND then start
+            // respawnTimer for the full time again (~4.6s for a 2.5s setting),
+            // and never came back at all with respawnTime = 0.
+            yield return respawnTime;
 
-            respawnTimer = respawnTime;
+            Respawn();
         }
 
         private void Respawn()

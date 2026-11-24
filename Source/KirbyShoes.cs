@@ -108,6 +108,21 @@ namespace Celeste.Entities
         private static bool IsShoeColor(Color c) =>
             c.R >= 0x60 && c.G <= 0x46 && c.B * 4 <= c.R * 3 && c.R - c.G >= 0x60;
 
+        /// <summary>
+        /// The shoes' own darker shading (7B2032, 5C052B, 4B1020, ...): still
+        /// red-dominant, but too dark to pass <see cref="IsShoeColor"/>'s
+        /// R - G gap. On its own this is too loose to identify a shoe, so it
+        /// only ever *extends* a blob that already has enough true shoe pixels
+        /// (see BuildMask) -- without it those shading pixels stayed maroon
+        /// beside the recolored shoe in most frames (float, hover, dash, fall,
+        /// run...). The near-black outline (R below 0x40) never matches.
+        /// </summary>
+        private static bool IsShoeShadeColor(Color c) =>
+            c.R >= 0x40 && c.G <= 0x46 && c.B * 4 <= c.R * 3 && c.R - c.G >= 0x30;
+
+        private static bool IsShoeOrShade(Color c) =>
+            c.A != 0 && (IsShoeColor(c) || IsShoeShadeColor(c));
+
         private static Texture2D GetMask(MTexture frame)
         {
             if (maskCache.TryGetValue(frame, out Texture2D cached))
@@ -146,14 +161,16 @@ namespace Celeste.Entities
             Color[] pixels = new Color[w * h];
             source.GetData(0, clip, pixels, 0, pixels.Length);
 
-            // Label 8-connected blobs of crimson pixels, then keep only the
-            // blobs big enough to be a shoe (see MinShoeBlobPixels).
+            // Label 8-connected blobs of crimson pixels (plus their darker
+            // shading), then keep only the blobs with enough true crimson
+            // pixels to be a shoe (see MinShoeBlobPixels) -- shading pixels
+            // join a blob but don't count toward that minimum.
             int[] blob = new int[w * h];
             List<int> blobSizes = new List<int> { 0 };
             Stack<int> stack = new Stack<int>();
             for (int i = 0; i < pixels.Length; i++)
             {
-                if (blob[i] != 0 || pixels[i].A == 0 || !IsShoeColor(pixels[i]))
+                if (blob[i] != 0 || !IsShoeOrShade(pixels[i]))
                     continue;
 
                 int id = blobSizes.Count;
@@ -163,7 +180,8 @@ namespace Celeste.Entities
                 while (stack.Count > 0)
                 {
                     int p = stack.Pop();
-                    blobSizes[id]++;
+                    if (IsShoeColor(pixels[p]))
+                        blobSizes[id]++;
                     int px = p % w, py = p / w;
                     for (int dy = -1; dy <= 1; dy++)
                     {
@@ -173,7 +191,7 @@ namespace Celeste.Entities
                             if (nx < 0 || ny < 0 || nx >= w || ny >= h)
                                 continue;
                             int n = ny * w + nx;
-                            if (blob[n] != 0 || pixels[n].A == 0 || !IsShoeColor(pixels[n]))
+                            if (blob[n] != 0 || !IsShoeOrShade(pixels[n]))
                                 continue;
                             blob[n] = id;
                             stack.Push(n);
@@ -195,7 +213,9 @@ namespace Celeste.Entities
                 byte v = (byte)Math.Round(shade * 255f);
                 maskPixels[i] = new Color(v, v, v, (byte)255);
                 any = true;
-            }            if (!any)
+            }
+
+            if (!any)
                 return null;
 
             var mask = new Texture2D(Engine.Instance.GraphicsDevice, w, h);

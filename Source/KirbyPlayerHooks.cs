@@ -34,6 +34,7 @@ namespace Celeste.Mod.KirbyHelperMechanics
             On.Celeste.Player.NormalUpdate += OnNormalUpdate;
             On.Celeste.Player.DashUpdate += OnDashUpdate;
             On.Celeste.Player.StartDash += OnStartDash;
+            On.Celeste.Player.SuperJump += OnSuperJump;
             On.Celeste.TrailManager.Add_Vector2_Image_PlayerHair_Vector2_Color_int_float_bool_bool += OnTrailManagerAdd;
             Everest.Events.Level.OnExit += OnLevelExit;
             PlayerSelectionManager.OnPlayerSelectionChanged += OnPlayerSelectionChanged;
@@ -53,6 +54,7 @@ namespace Celeste.Mod.KirbyHelperMechanics
             On.Celeste.Player.NormalUpdate -= OnNormalUpdate;
             On.Celeste.Player.DashUpdate -= OnDashUpdate;
             On.Celeste.Player.StartDash -= OnStartDash;
+            On.Celeste.Player.SuperJump -= OnSuperJump;
             On.Celeste.TrailManager.Add_Vector2_Image_PlayerHair_Vector2_Color_int_float_bool_bool -= OnTrailManagerAdd;
             Everest.Events.Level.OnExit -= OnLevelExit;
             PlayerSelectionManager.OnPlayerSelectionChanged -= OnPlayerSelectionChanged;
@@ -71,7 +73,7 @@ namespace Celeste.Mod.KirbyHelperMechanics
                 PlayerSelectionManager.GetOrCreate(level);
             }
 
-            SyncKirbyState(self);
+            SyncKirbyState(self, freshSpawn: true);
         }
 
         private static void OnPlayerSelectionChanged(PlayerSelectionManager.PlayerType _)
@@ -92,7 +94,7 @@ namespace Celeste.Mod.KirbyHelperMechanics
         /// so it matches <see cref="PlayerSelectionManager"/>'s current selection.
         /// Safe to call redundantly -- it no-ops if already in the desired state.
         /// </summary>
-        internal static void SyncKirbyState(global::Celeste.Player player)
+        internal static void SyncKirbyState(global::Celeste.Player player, bool freshSpawn = false)
         {
             if (player == null)
                 return;
@@ -102,7 +104,7 @@ namespace Celeste.Mod.KirbyHelperMechanics
 
             if (shouldBeKirby && existing == null)
             {
-                player.Add(new KirbyPlayerController());
+                player.Add(new KirbyPlayerController(healOnAttach: freshSpawn));
             }
             else if (!shouldBeKirby && existing != null)
             {
@@ -279,6 +281,12 @@ namespace Celeste.Mod.KirbyHelperMechanics
         /// unconditionally regardless of PlayerHair.Visible, and Kirby's sprite
         /// already includes its own "hair" as part of the body art.
         /// </summary>
+        private static void OnSuperJump(On.Celeste.Player.orig_SuperJump orig, global::Celeste.Player self)
+        {
+            orig(self);
+            self.Get<KirbyPlayerController>()?.ApplyKirbyWaveDashToSuperJump();
+        }
+
         private static global::Celeste.TrailManager.Snapshot OnTrailManagerAdd(On.Celeste.TrailManager.orig_Add_Vector2_Image_PlayerHair_Vector2_Color_int_float_bool_bool orig, Vector2 position, Image sprite, global::Celeste.PlayerHair hair, Vector2 scale, Color color, int depth, float duration, bool frozenUpdate, bool useRawDeltaTime)
         {
             if (sprite?.Entity is global::Celeste.Player player)

@@ -191,7 +191,7 @@
       <Anim id="wakeUp" path="wakeUp/" delay=".1" frames="0-4,5*10,6-14" />
       <Anim id="halfWakeUp" path="halfWakeUp" delay=".1" />
 
-      <Loop id="spin" path="spin" delay="0.1" />
+      <Loop id="spin" path="spin" delay="0.1" frames="0-13" />
       <Loop id="shaking" path="shaking" delay="0.1" />
       <Loop id="hug" path="hug" delay="0.08" />
 

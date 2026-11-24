@@ -133,11 +133,18 @@ public class K_PlayerHealthManager : Entity
         return manager;
     }
 
-    public void EnableKirbyMode(int maxHP = 6)
+    /// <param name="fullHeal">
+    /// False for a mid-level character swap, which keeps the HP Kirby had
+    /// when he was swapped out. An empty pool is always refilled regardless
+    /// -- Damage() ignores a dead pool, so coming back at 0 HP would be
+    /// permanent immortality.
+    /// </param>
+    public void EnableKirbyMode(int maxHP = 6, bool fullHeal = true)
     {
         IsKirbyMode = true;
         SetMaxHP(maxHP);
-        FullHeal();
+        if (fullHeal || IsDead)
+            FullHeal();
     }
 
     public void DisableKirbyMode()
