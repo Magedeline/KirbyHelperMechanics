@@ -1,0 +1,57 @@
+# Kirby Helper Mechanics: Kirby's gameplay tuning.
+# Speeds are in pixels per second, times in seconds. Celeste runs at 60 fps,
+# so 0.0167s is one frame. Vanilla Madeline for reference: run 90, jump -105,
+# gravity 900, dash 240.
+#
+# Any key left out keeps its built-in default (the values below). After
+# editing, open the debug console (~) and run khm_reload_tuning.
+
+# ── Float (hover) ───────────────────────────────────────────────────────
+KirbyFloatSpeed: -35          # upward kick of each flap (negative = up)
+KirbyFloatFallSpeed: 7        # slow sink speed while floating
+KirbyFloatGravity: 45         # how fast speed eases to the sink speed
+KirbyFloatHSpeed: 80          # max sideways speed while floating
+KirbyFloatHAccel: 550         # sideways acceleration while floating
+KirbyAirPuffSpeed: 120        # fall speed when puffing out (hold down)
+KirbyFloatMaxEntryCost: 3     # max flaps a re-entry into float can cost
+KirbyFloatMaxDuration: 1.5    # float seconds per airtime (Float Rules Trigger can override)
+
+# ── Wave dash ───────────────────────────────────────────────────────────
+KirbyWaveDashWindowTime: 0.15     # time after a down-diagonal dash that a landing counts
+KirbyWaveDashSpeedPerChain: 45    # extra speed per chained wave dash
+KirbyWaveDashMaxBonusSpeed: 220   # cap on that extra speed
+KirbyWaveDashChainResetTime: 0.5  # time on the ground before the chain resets
+KirbyWaveDashMaxChain: 5
+KirbyWaveDashJumpWindowTime: 0.25 # time to jump out of the slide and keep the bonus
+
+# ── Inhale ──────────────────────────────────────────────────────────────
+KirbyInhaleRange: 80              # pixels
+KirbyInhalePullSpeed: 200
+KirbyInhaleTime: 1.5              # max seconds per inhale
+KirbyInhaleMinPullFraction: 0.4   # pull strength left at the edge of range
+KirbyInhaleThreatRadius: 24       # enemies this close to Kirby are swallowed first
+KirbyInhaleSecondaryPull: 0.6     # pull on targets other than the top one
+KirbyInhaleAimTilt: 0.6           # how much up/down changes which target is preferred
+
+# ── Star spit ───────────────────────────────────────────────────────────
+KirbyStarSpitSpeed: 300
+KirbyStarSpitDamage: 2
+ThrowRecoil: 80
+StarEnemyHitPadding: 4            # extra hit radius against enemies only
+KirbyHitStreakWindow: 3           # seconds between hits that keep the streak
+
+# ── Hit-stop and shake ──────────────────────────────────────────────────
+HitStopDealtBase: 0.03            # freeze when Kirby lands a hit...
+HitStopPerDamage: 0.01            # ...plus this per damage point
+HitStopTaken: 0.04                # freeze when Kirby is hit (scaled by knockback)
+HitStopMax: 0.06                  # keep under the 0.08 input buffer
+HitShakeExtra: 0.05               # victim keeps shaking this long after the freeze
+HitShakeAmplitude: 2              # pixels
+
+# ── Taking damage ───────────────────────────────────────────────────────
+KirbyHurtKnockbackX: 120
+KirbyHurtKnockbackY: -90
+KnockbackPerExtraDamage: 0.25     # +25% per damage point past the first
+KnockbackPerMissingHP: 0.5        # up to +50% at nearly empty HP
+KnockbackMaxScale: 1.75
+SpikeDamage: 1

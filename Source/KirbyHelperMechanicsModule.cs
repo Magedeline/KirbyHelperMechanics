@@ -72,6 +72,8 @@ namespace Celeste.Mod.KirbyHelperMechanics
         public override void Load()
         {
             KirbyPlayerHooks.Load();
+            KirbySpikeHooks.Load();
+            KirbyHitShake.Load();
 
             FactoryHelperLoaded = Everest.Loader.DependencyLoaded(new EverestModuleMetadata { Name = "FactoryHelper", Version = new Version(1, 4, 1) });
             DZLoaded = Everest.Loader.DependencyLoaded(new EverestModuleMetadata { Name = "DZ", Version = new Version(1, 0, 0) });
@@ -80,6 +82,8 @@ namespace Celeste.Mod.KirbyHelperMechanics
         public override void Unload()
         {
             KirbyPlayerHooks.Unload();
+            KirbySpikeHooks.Unload();
+            KirbyHitShake.Unload();
         }
 
         public override void Initialize()
@@ -91,6 +95,9 @@ namespace Celeste.Mod.KirbyHelperMechanics
             // loaded (in any order relative to this mod) its ModExportName("DZ")
             // API, if any, has already been registered by the time this runs.
             typeof(DZImports).ModInterop();
+
+            // Every mod's content is indexed by now, so the YAML can be found.
+            KirbyTuning.Load();
         }
 
         public override void LoadContent(bool firstLoad)

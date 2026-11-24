@@ -20,6 +20,19 @@ namespace Celeste.Projectiles
         private float rotation;
         private readonly MTexture texture;
 
+        // Hidden hit assistance (HAL's Forgotten Land talk: if it looks like it
+        // should have hit, it hits). Walls use the real circle; enemies are
+        // tested against one a few pixels bigger, so a star that visibly grazes
+        // an enemy counts.
+        private static float EnemyHitPadding => global::Celeste.Mod.KirbyHelperMechanics.KirbyTuning.Current.StarEnemyHitPadding;
+        private readonly Collider wallCollider;
+        private readonly Collider enemyCollider;
+
+        // When the star was spat. The hit streak is judged from this moment, not
+        // from impact, so a long-travelling star still continues the combo
+        // (Return to Dream Land Deluxe counts hits before they connect).
+        private float spawnTime = -1f;
+
         /// <param name="size">0 = small (16px), 1 = medium (24px), 2 = large (32px) -- see projectiles/KHM/kirby/star/.</param>
         public PlayerStarBullet(Vector2 position, Vector2 velocity, KirbyPlayerController owner, int damage, int size = 1)
             : base(position)
@@ -30,13 +43,18 @@ namespace Celeste.Projectiles
             Depth = -50;
 
             size = Calc.Clamp(size, 0, 2);
-            Collider = new Circle(6f + size * 4f);
+            float radius = 6f + size * 4f;
+            Collider = wallCollider = new Circle(radius);
+            enemyCollider = new Circle(radius + EnemyHitPadding);
             texture = GFX.Game["projectiles/KHM/kirby/star/" + (size == 0 ? "small" : size == 1 ? "medium" : "large")];
         }
 
         public override void Update()
         {
             base.Update();
+
+            if (spawnTime < 0f)
+                spawnTime = (Scene as Level)?.TimeActive ?? 0f;
 
             Position += velocity * Engine.DeltaTime;
             // Spins in its direction of travel (clockwise when flying right).
@@ -60,18 +78,31 @@ namespace Celeste.Projectiles
                 return;
             }
 
-            // Enemy hit — first valid target wins, projectile dies on contact
-            foreach (Entity entity in Scene.Entities)
+            // Enemy hit — first valid target wins, projectile dies on contact.
+            // Checked with the padded enemy collider (see EnemyHitPadding).
+            Entity hit = null;
+            Collider = enemyCollider;
+            try
             {
-                if (!owner.IsValidTarget(entity))
-                    continue;
-                if (!CollideCheck(entity))
-                    continue;
+                foreach (Entity entity in Scene.Entities)
+                {
+                    if (owner.IsValidTarget(entity) && CollideCheck(entity))
+                    {
+                        hit = entity;
+                        break;
+                    }
+                }
+            }
+            finally
+            {
+                Collider = wallCollider;
+            }
 
-                owner.DealProjectileDamage(entity, damage, velocity.SafeNormalize());
+            if (hit != null)
+            {
+                owner.DealProjectileDamage(hit, damage, velocity.SafeNormalize(), spawnTime);
                 Burst();
                 RemoveSelf();
-                return;
             }
         }
 

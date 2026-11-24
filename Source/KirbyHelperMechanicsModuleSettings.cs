@@ -31,6 +31,14 @@ namespace Celeste.Mod.KirbyHelperMechanics
         public ButtonBinding KirbyFloatButton { get; set; }
 
         public bool GentleBreezeMode { get; set; } = false;
+
+        /// <summary>
+        /// Brief freeze-frame when Kirby lands a hit or gets hit (see
+        /// KirbyPlayerController.KirbyHitStop). On by default; some players find
+        /// freeze-frames jarring, so it can be turned off.
+        /// </summary>
+        [SettingName("modoptions_kirbyhelpermechanics_hitstop")]
+        public bool KirbyHitStop { get; set; } = true;
         public bool KirbyPlayerEnabled { get; set; } = true;
         public bool PlayerAutoSelect { get; set; } = false;
 
