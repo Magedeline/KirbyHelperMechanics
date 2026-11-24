@@ -943,6 +943,38 @@ namespace Celeste.Entities
 
             level?.Displacement.AddBurst(target.Center, .2f, 4, 24, .2f, Ease.QuadOut, Ease.QuadOut);
             Dust.Burst(target.Center, knockbackDir.Angle(), 4);
+
+            // Harder hits freeze a little longer (2-damage star spit = 0.05s).
+            KirbyHitStop(Math.Min(HitStopMax, HitStopDealtBase + HitStopPerDamage * damage), target);
+        }
+
+        // Hit-stop (freeze-frame) lengths, in seconds. Kept short on purpose:
+        // Celeste's own dash freeze is 0.05s, and the Celeste team shortened the
+        // refill-crystal freeze after players reported it swallowing inputs.
+        // Input buffers (0.08s) outlast these, so a press made during the
+        // freeze still goes through.
+        private const float HitStopDealtBase = 0.03f;
+        private const float HitStopPerDamage = 0.01f;
+        private const float HitStopTaken = 0.06f;
+        private const float HitStopMax = 0.06f;
+
+        // The victim keeps shaking a few frames past the freeze so the shake
+        // reads even on the shortest (0.04s) stops.
+        private const float HitShakeExtra = 0.05f;
+
+        /// <summary>
+        /// Freezes the game for <paramref name="time"/> seconds and shakes
+        /// <paramref name="victim"/> (only the one who got hit -- the attacker
+        /// stays still), unless the player turned hit-stop off. Celeste.Freeze
+        /// takes the longer of this and any freeze already running, so
+        /// overlapping hits don't stack.
+        /// </summary>
+        private static void KirbyHitStop(float time, Entity victim)
+        {
+            if (KirbyHelperMechanicsModule.Settings?.KirbyHitStop == false)
+                return;
+            CelesteGame.Freeze(time);
+            KirbyHitShake.Start(victim, time + HitShakeExtra);
         }
 
         /// <summary>Public wrapper so <see cref="PlayerStarBullet"/> can reuse the same damage checks.</summary>
@@ -1143,6 +1175,7 @@ namespace Celeste.Entities
             Audio.Play("event:/game/general/thing_booped", player.Position);
             Input.Rumble(RumbleStrength.Medium, RumbleLength.Short);
             level?.Shake(0.2f);
+            KirbyHitStop(HitStopTaken, player);
         }
 
         #endregion

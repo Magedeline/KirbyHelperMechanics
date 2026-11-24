@@ -202,6 +202,7 @@ namespace Celeste.Mod.KirbyHelperMechanics
         {
             K_PlayerHealthManager.ResetStatics();
             PlayerSelectionManager.ClearLevelOverride();
+            KirbyHitShake.Clear();
         }
 
         /// <summary>

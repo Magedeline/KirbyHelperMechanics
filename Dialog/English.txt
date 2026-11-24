@@ -13,6 +13,7 @@ modoptions_kirbyhelpermechanics_inhalebutton= Kirby Inhale
 modoptions_kirbyhelpermechanics_floatbutton= Kirby Float
 modoptions_kirbyhelpermechanics_spitpuffbutton= Kirby Spit Puff
 modoptions_kirbyhelpermechanics_toggleplayerbutton= Toggle Kirby / Madeline
+modoptions_kirbyhelpermechanics_hitstop= Kirby Hit-Stop
 
 # Maps ------------------------------------------------------------------
 # Everest derives a map's chapter-select title automatically from its

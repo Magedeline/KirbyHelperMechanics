@@ -72,6 +72,8 @@ namespace Celeste.Mod.KirbyHelperMechanics
         public override void Load()
         {
             KirbyPlayerHooks.Load();
+            KirbySpikeHooks.Load();
+            KirbyHitShake.Load();
 
             FactoryHelperLoaded = Everest.Loader.DependencyLoaded(new EverestModuleMetadata { Name = "FactoryHelper", Version = new Version(1, 4, 1) });
             DZLoaded = Everest.Loader.DependencyLoaded(new EverestModuleMetadata { Name = "DZ", Version = new Version(1, 0, 0) });
@@ -80,6 +82,8 @@ namespace Celeste.Mod.KirbyHelperMechanics
         public override void Unload()
         {
             KirbyPlayerHooks.Unload();
+            KirbySpikeHooks.Unload();
+            KirbyHitShake.Unload();
         }
 
         public override void Initialize()
